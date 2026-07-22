@@ -1,0 +1,101 @@
+
+> telegram-mini-app@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.10 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://10.0.70.25:3000
+- Environments: .env.local
+✓ Ready in 636ms
+
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error [ConnectTimeoutError]: Connect Timeout Error (attempted addresses: 8.6.112.0:443, 8.47.69.0:443, timeout: 10000ms)
+      at ignore-listed frames {
+    code: 'UND_ERR_CONNECT_TIMEOUT'
+  }
+}
+TypeError: fetch failed
+    at async AdminDashboard (src\app\admin\page.tsx:12:7)
+  10 |   const {
+  11 |     data: { user },
+> 12 |   } = await supabase.auth.getUser();
+     |       ^
+  13 |
+  14 |   if (!user) {
+  15 |     redirect("/login"); {
+  [cause]: Error [ConnectTimeoutError]: Connect Timeout Error (attempted addresses: 8.6.112.0:443, 8.47.69.0:443, timeout: 10000ms)
+      at ignore-listed frames {
+    code: 'UND_ERR_CONNECT_TIMEOUT'
+  }
+}
+ GET /admin 307 in 20.9s (next.js: 170ms, proxy.ts: 10.2s, application-code: 10.5s)
+ GET /login 200 in 165ms (next.js: 31ms, proxy.ts: 5ms, application-code: 129ms)
+ GET /login 200 in 10.1s (next.js: 10ms, proxy.ts: 10.0s, application-code: 53ms)
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error [ConnectTimeoutError]: Connect Timeout Error (attempted addresses: 8.6.112.0:443, 8.47.69.0:443, timeout: 10000ms)
+      at ignore-listed frames {
+    code: 'UND_ERR_CONNECT_TIMEOUT'
+  }
+}
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error [ConnectTimeoutError]: Connect Timeout Error (attempted addresses: 8.6.112.0:443, 8.47.69.0:443, timeout: 10000ms)
+      at ignore-listed frames {
+    code: 'UND_ERR_CONNECT_TIMEOUT'
+  }
+}
+TypeError: fetch failed
+    at async AdminDashboard (src\app\admin\page.tsx:12:7)
+  10 |   const {
+  11 |     data: { user },
+> 12 |   } = await supabase.auth.getUser();
+     |       ^
+  13 |
+  14 |   if (!user) {
+  15 |     redirect("/login"); {
+  [cause]: Error [ConnectTimeoutError]: Connect Timeout Error (attempted addresses: 8.6.112.0:443, 8.47.69.0:443, timeout: 10000ms)
+      at ignore-listed frames {
+    code: 'UND_ERR_CONNECT_TIMEOUT'
+  }
+}
+ GET /admin 200 in 20.3s (next.js: 15ms, proxy.ts: 10.0s, application-code: 10.3s)
+ GET /login 200 in 10.1s (next.js: 11ms, proxy.ts: 10.0s, application-code: 24ms)
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error [ConnectTimeoutError]: Connect Timeout Error (attempted addresses: 8.6.112.0:443, 8.47.69.0:443, timeout: 10000ms)
+      at ignore-listed frames {
+    code: 'UND_ERR_CONNECT_TIMEOUT'
+  }
+}
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error [ConnectTimeoutError]: Connect Timeout Error (attempted addresses: 8.6.112.0:443, 8.47.69.0:443, timeout: 10000ms)
+      at ignore-listed frames {
+    code: 'UND_ERR_CONNECT_TIMEOUT'
+  }
+}
+ GET /login 200 in 10.1s (next.js: 7ms, proxy.ts: 10.0s, application-code: 36ms)
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error [ConnectTimeoutError]: Connect Timeout Error (attempted addresses: 8.6.112.0:443, 8.47.69.0:443, timeout: 10000ms)
+      at ignore-listed frames {
+    code: 'UND_ERR_CONNECT_TIMEOUT'
+  }
+}
+TypeError: fetch failed
+    at async AdminDashboard (src\app\admin\page.tsx:12:7)
+  10 |   const {
+  11 |     data: { user },
+> 12 |   } = await supabase.auth.getUser();
+     |       ^
+  13 |
+  14 |   if (!user) {
+  15 |     redirect("/login"); {
+  [cause]: Error [ConnectTimeoutError]: Connect Timeout Error (attempted addresses: 8.6.112.0:443, 8.47.69.0:443, timeout: 10000ms)
+      at ignore-listed frames {
+    code: 'UND_ERR_CONNECT_TIMEOUT'
+  }
+}
+ GET /admin 200 in 20.4s (next.js: 9ms, proxy.ts: 10.0s, application-code: 10.3s)
