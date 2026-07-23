@@ -40,7 +40,7 @@ export async function sendTelegramMessage(
   const url = `${TELEGRAM_API}/bot${botToken}/sendMessage`;
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({
       chat_id: chatId,
       text,
@@ -78,17 +78,25 @@ export async function sendServiceButtons(
   services: Array<{ id: string; title: string; price: number }>,
   webAppUrl: string
 ) {
-  const buttons = services.map((service) => [
-    {
-      text: `${service.title} - $${service.price}`,
-      web_app: { url: `${webAppUrl}?service=${service.id}` },
-    },
-  ]);
+  const buttons = services.map((service) => {
+    // Telegram inline keyboard button text max is 64 bytes
+    // Russian chars are 2 bytes each in UTF-8, so max ~30 chars
+    let title = service.title;
+    if (title.length > 30) {
+      title = title.substring(0, 27) + "...";
+    }
+    return [
+      {
+        text: `${title} - ${service.price} ₽`,
+        web_app: { url: `${webAppUrl}?service=${service.id}` },
+      },
+    ];
+  });
 
   return sendTelegramMessage(
     botToken,
     chatId,
-    "📋 <b>Our Services:</b>\n\nChoose a service to book:",
+    "📋 <b>Наши услуги:</b>\n\nВыберите услугу:",
     {
       reply_markup: {
         inline_keyboard: buttons,
@@ -105,7 +113,7 @@ export async function answerCallbackQuery(
   const url = `${TELEGRAM_API}/bot${botToken}/answerCallbackQuery`;
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({
       callback_query_id: callbackQueryId,
       text,
@@ -121,7 +129,7 @@ export async function setBotCommands(
   const url = `${TELEGRAM_API}/bot${botToken}/setMyCommands`;
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({ commands }),
   });
   return response.json();
@@ -134,7 +142,7 @@ export async function setWebhook(
   const url = `${TELEGRAM_API}/bot${botToken}/setWebhook`;
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({
       url: webhookUrl,
       allowed_updates: ["message", "callback_query"],
