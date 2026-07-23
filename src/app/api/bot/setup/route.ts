@@ -48,12 +48,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // Set bot commands
+    // Set bot commands in Russian
     await setBotCommands(botToken, [
-      { command: "start", description: "Start the bot" },
-      { command: "help", description: "Show help" },
-      { command: "services", description: "View services" },
-      { command: "book", description: "Book an appointment" },
+      { command: "start", description: "Начать работу с ботом" },
+      { command: "help", description: "Показать справку" },
+      { command: "services", description: "Наши услуги" },
+      { command: "info", description: "Информация о библиотеке" },
+      { command: "book", description: "Записаться" },
     ]);
 
     // Update user record - handle missing column gracefully
