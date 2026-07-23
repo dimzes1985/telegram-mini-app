@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   sendTelegramMessage,
   sendWebAppButton,
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   // Find the bot owner by bot_username or bot_token
   // For now, we'll use a simple approach - find user with this bot
