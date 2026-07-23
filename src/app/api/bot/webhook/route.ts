@@ -8,6 +8,21 @@ import {
   type TelegramUpdate,
 } from "@/lib/telegram-bot";
 
+const LIBRARY_INFO = `📚 <b>Библиотека Уварово</b>
+
+Муниципальное бюджетное учреждение культуры
+«Централизованная библиотечная система г. Уварово»
+
+📍 Адрес: 393460, Тамбовская обл., г. Уварово, 2-й мкр, д. 8
+📞 Телефон: 8 (47558) 4-11-80
+✉️ Email: bibluv@yandex.ru
+👤 Директор: Терентьева Ольга Викторовна
+
+🕐 Время работы:
+Пн-Сб: 9:00 - 18:00
+Перерыв: 13:00 - 14:00
+Вс: выходной`;
+
 // POST - Telegram webhook handler
 export async function POST(req: Request) {
   const update: TelegramUpdate = await req.json();
@@ -25,7 +40,6 @@ export async function POST(req: Request) {
   const supabase = createAdminClient();
 
   // Find the bot owner by bot_username or bot_token
-  // For now, we'll use a simple approach - find user with this bot
   const { data: user } = await supabase
     .from("users")
     .select("id, business_name, bot_token, bot_username")
@@ -53,16 +67,18 @@ export async function POST(req: Request) {
       if (services && services.length > 0) {
         await sendServiceButtons(botToken, chatId!, services, appUrl);
       } else {
-        await sendTelegramMessage(botToken, chatId!, "No services available yet.");
+        await sendTelegramMessage(botToken, chatId!, "Услуги пока не добавлены.");
       }
     } else if (callbackData === "open_app") {
       await sendWebAppButton(
         botToken,
         chatId!,
-        "Open our booking app:",
+        "Откройте наше приложение для записи:",
         appUrl,
-        "📅 Book Now"
+        "📅 Записаться"
       );
+    } else if (callbackData === "show_info") {
+      await sendTelegramMessage(botToken, chatId!, LIBRARY_INFO);
     }
 
     return NextResponse.json({ ok: true });
@@ -77,17 +93,19 @@ export async function POST(req: Request) {
         await sendTelegramMessage(
           botToken,
           chatId!,
-          `👋 Welcome to <b>${user.business_name}</b>!\n\nI can help you:\n• Learn about our services\n• Book appointments\n• Get answers to your questions\n\nHow can I help you today?`,
+          `👋 Добро пожаловать в <b>${user.business_name}</b>!\n\nЯ могу помочь вам:\n• Узнать об услугах библиотеки\n• Записаться на мероприятия\n• Получить информацию о часах работы\n\nКак я могу вам помочь?`,
           {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: "📅 Book Appointment", web_app: { url: appUrl } },
+                  { text: "📋 Наши услуги", callback_data: "show_services" },
                 ],
                 [
-                  { text: "📋 View Services", callback_data: "show_services" },
+                  { text: "ℹ️ О библиотеке", callback_data: "show_info" },
                 ],
-                [{ text: "❓ Help", callback_data: "show_help" }],
+                [
+                  { text: "💬 Задать вопрос", web_app: { url: appUrl } },
+                ],
               ],
             },
           }
@@ -98,8 +116,12 @@ export async function POST(req: Request) {
         await sendTelegramMessage(
           botToken,
           chatId!,
-          `📖 <b>Available Commands:</b>\n\n/start - Welcome message\n/services - View our services\n/book - Book an appointment\n/help - Show this help message\n\nYou can also just type your question and I'll help you!`
+          `📖 <b>Доступные команды:</b>\n\n/start - Приветствие\n/services - Наши услуги\n/info - Информация о библиотеке\n/help - Эта справка\n\nВы также можете просто написать сообщение, и я постараюсь помочь!`
         );
+        break;
+
+      case "/info":
+        await sendTelegramMessage(botToken, chatId!, LIBRARY_INFO);
         break;
 
       case "/services":
@@ -115,9 +137,9 @@ export async function POST(req: Request) {
             await sendWebAppButton(
               botToken,
               chatId!,
-              "Ready to book? Open our booking app:",
+              "Готовы записаться? Откройте наше приложение:",
               appUrl,
-              "📅 Book Now"
+              "📅 Записаться"
             );
           } else {
             await sendServiceButtons(botToken, chatId!, services, appUrl);
@@ -126,7 +148,7 @@ export async function POST(req: Request) {
           await sendTelegramMessage(
             botToken,
             chatId!,
-            "No services available at the moment. Please check back later!"
+            "Услуги пока не добавлены. Пожалуйста, загляните позже!"
           );
         }
         break;
@@ -135,7 +157,7 @@ export async function POST(req: Request) {
         await sendTelegramMessage(
           botToken,
           chatId!,
-          "Unknown command. Type /help to see available commands."
+          "Неизвестная команда. Напишите /help для списка доступных команд."
         );
     }
 
@@ -143,17 +165,16 @@ export async function POST(req: Request) {
   }
 
   // Handle regular messages - use AI chat
-  // For now, send a simple response with app link
   await sendTelegramMessage(
     botToken,
     chatId!,
-    `Thanks for your message! For detailed assistance, please use our booking app:`,
+    `Спасибо за ваше сообщение! Для более подробной помощи, пожалуйста, используйте наше приложение:`,
     {
       reply_markup: {
         inline_keyboard: [
           [
             {
-              text: "💬 Chat with AI Assistant",
+              text: "💬 Задать вопрос ИИ-ассистенту",
               web_app: { url: appUrl },
             },
           ],
