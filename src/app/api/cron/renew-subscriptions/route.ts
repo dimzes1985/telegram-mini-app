@@ -10,18 +10,23 @@ const CRON_SECRET = process.env.CRON_SECRET;
 
 // POST /api/cron/renew-subscriptions
 // Call this endpoint periodically (e.g. daily) to charge active subscriptions
-// whose period has ended. Protected by CRON_SECRET header.
+// whose period has ended. Accepts requests from Vercel Cron (identified by the
+// x-vercel-cron-schedule header) or external schedulers using a Bearer CRON_SECRET.
 export async function POST(req: Request) {
-  if (!CRON_SECRET) {
-    return NextResponse.json(
-      { error: "CRON_SECRET not configured" },
-      { status: 500 }
-    );
-  }
+  const isVercelCron = req.headers.has("x-vercel-cron-schedule");
 
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isVercelCron) {
+    if (!CRON_SECRET) {
+      return NextResponse.json(
+        { error: "CRON_SECRET not configured" },
+        { status: 500 }
+      );
+    }
+
+    const authHeader = req.headers.get("authorization");
+    if (authHeader !== `Bearer ${CRON_SECRET}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   if (!isYookassaConfigured()) {
