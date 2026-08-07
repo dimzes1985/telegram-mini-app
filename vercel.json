@@ -1,0 +1,11 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/renew-subscriptions",
+      "schedule": "0 4 * * *",
+      "headers": {
+        "Authorization": "Bearer $CRON_SECRET"
+      }
+    }
+  ]
+}
