@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Calendar, Settings, Briefcase } from "lucide-react";
+import { LayoutDashboard, Calendar, Settings, Briefcase, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -20,6 +20,11 @@ const navItems = [
     label: "Bookings",
     href: "/admin/bookings",
     icon: Calendar,
+  },
+  {
+    label: "Billing",
+    href: "/admin/billing",
+    icon: CreditCard,
   },
   {
     label: "Settings",

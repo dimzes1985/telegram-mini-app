@@ -1,32 +1,45 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChatInterface } from "@/components/telegram/chat-interface";
 import { BookingFlow } from "@/components/telegram/booking-flow";
 import { useTelegram } from "@/lib/telegram";
 import { MessageSquare, Calendar } from "lucide-react";
 
-const DEFAULT_BUSINESS_ID = "your-business-id-here";
-
 export default function TelegramMiniApp() {
-  const { user, initData, webApp, colorScheme } = useTelegram();
-  const [businessId, setBusinessId] = useState(DEFAULT_BUSINESS_ID);
+  const { user, webApp, colorScheme } = useTelegram();
 
-  useEffect(() => {
-    // Priority: start_param from Telegram > URL param > default
+  // Derive business id during render:
+  // start_param from Telegram takes priority, then the URL query param.
+  const businessId = useMemo(() => {
     const startParam = webApp.initDataUnsafe?.start_param;
     if (startParam) {
-      setBusinessId(startParam);
-      return;
+      return startParam;
     }
-
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get("business_id");
-    if (id) {
-      setBusinessId(id);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("business_id");
     }
+    return null;
   }, [webApp]);
+
+  if (!businessId) {
+    return (
+      <div
+        className="min-h-screen flex flex-col items-center justify-center p-8 text-center"
+        style={{
+          backgroundColor: webApp.themeParams?.bg_color || (colorScheme === "dark" ? "#1a1a1a" : "#f5f5f5"),
+          color: webApp.themeParams?.text_color || (colorScheme === "dark" ? "#ffffff" : "#000000"),
+        }}
+      >
+        <h1 className="text-lg font-bold mb-2">Business not found</h1>
+        <p className="text-sm opacity-70">
+          Open this app from your business Telegram bot to get started.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div

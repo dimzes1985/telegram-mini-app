@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { setWebhook, getWebhookInfo, setBotCommands } from "@/lib/telegram-bot";
+import { randomBytes } from "crypto";
+
+function generateSecret() {
+  return randomBytes(32).toString("hex");
+}
 
 // POST - Setup bot webhook
-export async function POST(req: Request) {
+export async function POST() {
   const supabase = await createClient();
 
   const {
@@ -34,12 +40,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Bot token not configured" }, { status: 400 });
   }
 
+  // Generate (or reuse) a per-business webhook secret
+  const admin = createAdminClient();
+  let secret = "";
+  try {
+    const { data: userData } = await admin
+      .from("users")
+      .select("bot_webhook_secret")
+      .eq("id", user.id)
+      .single();
+    secret = userData?.bot_webhook_secret || generateSecret();
+  } catch {
+    secret = generateSecret();
+  }
+
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const webhookUrl = `${baseUrl}/api/bot/webhook`;
+  const webhookUrl = `${baseUrl}/api/bot/webhook/${user.id}`;
 
   try {
-    // Set webhook
-    const webhookResult = await setWebhook(botToken, webhookUrl);
+    // Set webhook with per-business URL and secret token
+    const webhookResult = await setWebhook(botToken, webhookUrl, secret);
 
     if (!webhookResult.ok) {
       return NextResponse.json(
@@ -53,15 +73,15 @@ export async function POST(req: Request) {
       { command: "start", description: "Начать работу с ботом" },
       { command: "help", description: "Показать справку" },
       { command: "services", description: "Наши услуги" },
-      { command: "info", description: "Информация о библиотеке" },
+      { command: "info", description: "Информация о бизнесе" },
       { command: "book", description: "Записаться" },
     ]);
 
-    // Update user record - handle missing column gracefully
+    // Store webhook secret and mark as configured
     try {
-      await supabase
+      await admin
         .from("users")
-        .update({ bot_webhook_set: true })
+        .update({ bot_webhook_secret: secret, bot_webhook_set: true })
         .eq("id", user.id);
     } catch {
       // Column might not exist, ignore

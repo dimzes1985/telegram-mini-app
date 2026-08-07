@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Save, Bot, ExternalLink, CheckCircle, XCircle } from "lucide-react";
+import { Save, Bot, ExternalLink, CheckCircle } from "lucide-react";
 
 interface WorkingHoursDay {
   start: string;
@@ -39,6 +39,10 @@ const DEFAULT_WORKING_HOURS: Record<string, WorkingHoursDay> = {
 
 export default function SettingsPage() {
   const [businessName, setBusinessName] = useState("");
+  const [businessDescription, setBusinessDescription] = useState("");
+  const [businessAddress, setBusinessAddress] = useState("");
+  const [businessPhone, setBusinessPhone] = useState("");
+  const [businessEmail, setBusinessEmail] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [workingHours, setWorkingHours] = useState<Record<string, WorkingHoursDay>>(DEFAULT_WORKING_HOURS);
   const [botToken, setBotToken] = useState("");
@@ -50,18 +54,26 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [settingUpBot, setSettingUpBot] = useState(false);
   const [botError, setBotError] = useState("");
+  const [plan, setPlan] = useState("free");
+  const [aiUsage, setAiUsage] = useState<{ plan: string; used: number; limit: number; remaining: number } | null>(null);
 
   useEffect(() => {
     fetch("/api/settings")
       .then((res) => res.json())
       .then((data) => {
         setBusinessName(data.business_name || "");
+        setBusinessDescription(data.business_description || "");
+        setBusinessAddress(data.business_address || "");
+        setBusinessPhone(data.business_phone || "");
+        setBusinessEmail(data.business_email || "");
         setSystemPrompt(data.system_prompt || "");
         if (data.working_hours) {
           setWorkingHours(data.working_hours);
         }
         setBotTokenSet(data.bot_token_set || false);
         setBotUsername(data.bot_username || "");
+        setPlan(data.plan || "free");
+        setAiUsage(data.ai_usage || null);
         setLoading(false);
       });
 
@@ -83,6 +95,10 @@ export default function SettingsPage() {
 
     const updateData: Record<string, unknown> = {
       business_name: businessName,
+      business_description: businessDescription,
+      business_address: businessAddress,
+      business_phone: businessPhone,
+      business_email: businessEmail,
       system_prompt: systemPrompt,
       working_hours: workingHours,
     };
@@ -155,6 +171,47 @@ export default function SettingsPage() {
                 onChange={(e) => setBusinessName(e.target.value)}
                 placeholder="Your Business Name"
               />
+            </div>
+            <div>
+              <Label htmlFor="businessDescription">Description</Label>
+              <Textarea
+                id="businessDescription"
+                value={businessDescription}
+                onChange={(e) => setBusinessDescription(e.target.value)}
+                placeholder="Short description shown to customers (e.g. 'Beauty salon in downtown')"
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="businessAddress">Address</Label>
+              <Input
+                id="businessAddress"
+                value={businessAddress}
+                onChange={(e) => setBusinessAddress(e.target.value)}
+                placeholder="Street, building, city"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="businessPhone">Phone</Label>
+                <Input
+                  id="businessPhone"
+                  type="tel"
+                  value={businessPhone}
+                  onChange={(e) => setBusinessPhone(e.target.value)}
+                  placeholder="+7 (900) 000-00-00"
+                />
+              </div>
+              <div>
+                <Label htmlFor="businessEmail">Email</Label>
+                <Input
+                  id="businessEmail"
+                  type="email"
+                  value={businessEmail}
+                  onChange={(e) => setBusinessEmail(e.target.value)}
+                  placeholder="info@business.com"
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -271,6 +328,43 @@ export default function SettingsPage() {
                 )}
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Plan & AI Usage</CardTitle>
+            <CardDescription>
+              Your current plan and monthly AI message quota.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium capitalize">{plan} plan</p>
+                <p className="text-sm text-gray-500">
+                  {aiUsage ? (
+                    <>
+                      AI messages used this month:{" "}
+                      <span className="font-medium">
+                        {aiUsage.used} / {aiUsage.limit}
+                      </span>
+                    </>
+                  ) : (
+                    "AI message usage is unavailable."
+                  )}
+                </p>
+              </div>
+              <Badge variant="secondary" className="capitalize">
+                {plan}
+              </Badge>
+            </div>
+            {aiUsage && aiUsage.remaining <= 0 && (
+              <p className="text-sm text-red-500">
+                You have reached your monthly AI message limit. Upgrade your plan
+                to continue using the AI assistant.
+              </p>
+            )}
           </CardContent>
         </Card>
 

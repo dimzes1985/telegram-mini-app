@@ -137,7 +137,8 @@ export async function setBotCommands(
 
 export async function setWebhook(
   botToken: string,
-  webhookUrl: string
+  webhookUrl: string,
+  secretToken?: string
 ) {
   const url = `${TELEGRAM_API}/bot${botToken}/setWebhook`;
   const response = await fetch(url, {
@@ -146,6 +147,7 @@ export async function setWebhook(
     body: JSON.stringify({
       url: webhookUrl,
       allowed_updates: ["message", "callback_query"],
+      ...(secretToken ? { secret_token: secretToken } : {}),
     }),
   });
   return response.json();

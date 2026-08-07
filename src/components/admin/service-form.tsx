@@ -11,7 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Service } from "@/types";
 
 interface ServiceFormProps {

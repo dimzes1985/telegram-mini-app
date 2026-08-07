@@ -116,7 +116,7 @@ export default async function AdminDashboard() {
                   <div>
                     <p className="font-medium">{booking.customer_name}</p>
                     <p className="text-sm text-gray-600">
-                      {(booking.service as any)?.title} • {booking.booking_date}{" "}
+                      {booking.service?.title} • {booking.booking_date}{" "}
                       at {booking.booking_time}
                     </p>
                   </div>

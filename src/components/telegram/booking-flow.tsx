@@ -4,11 +4,10 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { useTelegram } from "@/lib/telegram";
-import { ArrowLeft, Check, Clock } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 import { Service, TimeSlot } from "@/types";
 import { format } from "date-fns";
 
@@ -19,7 +18,7 @@ interface BookingFlowProps {
 type Step = "services" | "datetime" | "confirm" | "success";
 
 export function BookingFlow({ businessId }: BookingFlowProps) {
-  const { webApp } = useTelegram();
+  const { webApp, initData } = useTelegram();
   const [step, setStep] = useState<Step>("services");
   const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -68,6 +67,7 @@ export function BookingFlow({ businessId }: BookingFlowProps) {
         booking_time: selectedTime,
         customer_name: customerName,
         customer_phone: customerPhone || null,
+        initData,
       }),
     });
 
@@ -152,8 +152,8 @@ export function BookingFlow({ businessId }: BookingFlowProps) {
           <Calendar
             mode="single"
             selected={selectedDate}
-            onSelect={setSelectedDate}
-            disabled={(date) => date < new Date()}
+            onSelect={(value) => setSelectedDate(value)}
+            disabled={(date: Date) => date < new Date()}
             className="rounded-md border"
           />
         </div>

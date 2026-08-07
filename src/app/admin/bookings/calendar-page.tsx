@@ -174,7 +174,7 @@ export function CalendarView() {
                       </Badge>
                     </div>
                     <p className="text-sm text-gray-600">
-                      {(booking.service as any)?.title}
+                      {booking.service?.title}
                     </p>
                     <p className="text-sm text-gray-500">
                       {booking.booking_time}

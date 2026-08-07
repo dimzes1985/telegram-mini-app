@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 interface WorkingHoursDay {
   start: string;
@@ -9,7 +9,7 @@ interface WorkingHoursDay {
 
 // GET available time slots for a specific date and service
 export async function GET(req: Request) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   const { searchParams } = new URL(req.url);
   const date = searchParams.get("date");
@@ -26,12 +26,19 @@ export async function GET(req: Request) {
   // Get service duration
   const { data: service } = await supabase
     .from("services")
-    .select("duration_minutes")
+    .select("duration_minutes, user_id")
     .eq("id", serviceId)
     .single();
 
   if (!service) {
     return NextResponse.json({ error: "Service not found" }, { status: 404 });
+  }
+
+  if (service.user_id !== businessId) {
+    return NextResponse.json(
+      { error: "Service does not belong to this business" },
+      { status: 403 }
+    );
   }
 
   // Get business working hours

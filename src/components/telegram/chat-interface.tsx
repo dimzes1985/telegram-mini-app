@@ -14,10 +14,10 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({ businessId }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
-  const { webApp } = useTelegram();
+  const { webApp, initData } = useTelegram();
   const transport = new DefaultChatTransport({
     api: "/api/chat",
-    body: { businessId },
+    body: () => ({ businessId, initData }),
   });
 
   const { messages, sendMessage, status } = useChat({

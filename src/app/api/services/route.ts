@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getPlan, PLANS } from "@/lib/plans";
 
 // GET all services for the logged-in user
 export async function GET() {
@@ -45,6 +46,29 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: "Title and price are required" },
       { status: 400 }
+    );
+  }
+
+  // Enforce plan service limit
+  const { data: userData } = await supabase
+    .from("users")
+    .select("plan")
+    .eq("id", user.id)
+    .single();
+  const plan = getPlan(userData?.plan);
+  const maxServices = PLANS[plan].maxServices;
+
+  const { count } = await supabase
+    .from("services")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id);
+
+  if (count !== null && count >= maxServices) {
+    return NextResponse.json(
+      {
+        error: `Your ${plan} plan allows up to ${maxServices === Infinity ? "unlimited" : maxServices} services. Upgrade to add more.`,
+      },
+      { status: 403 }
     );
   }
 

@@ -22,7 +22,12 @@ export function BookingsListView() {
   };
 
   useEffect(() => {
-    fetchBookings();
+    fetch("/api/bookings")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data) setBookings(data);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const handleStatusUpdate = async (id: string, status: string) => {
@@ -71,7 +76,7 @@ export function BookingsListView() {
                   <div>
                     <h3 className="font-semibold">{booking.customer_name}</h3>
                     <p className="text-sm text-gray-600">
-                      {(booking.service as any)?.title}
+                      {booking.service?.title}
                     </p>
                     <p className="text-sm text-gray-500">
                       {booking.booking_date} at {booking.booking_time}

@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { ServiceForm } from "@/components/admin/service-form";
 import { Service } from "@/types";
 
@@ -22,7 +22,12 @@ export default function ServicesPage() {
   };
 
   useEffect(() => {
-    fetchServices();
+    fetch("/api/services")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data) setServices(data);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const handleCreate = async (data: Partial<Service>) => {

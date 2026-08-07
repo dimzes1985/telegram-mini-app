@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getAiUsage } from "@/lib/ai-usage";
 
 // GET user settings
 export async function GET() {
@@ -16,7 +18,7 @@ export async function GET() {
   // Query basic columns first (always exist)
   const { data, error } = await supabase
     .from("users")
-    .select("business_name, system_prompt, working_hours")
+    .select("business_name, business_description, business_address, business_phone, business_email, system_prompt, working_hours, plan")
     .eq("id", user.id)
     .single();
 
@@ -44,17 +46,24 @@ export async function GET() {
   }
 
   // Mask bot token for security
-  const maskedData = {
+  const maskedData: Record<string, unknown> = {
     ...data,
     ...botData,
     bot_token: botData.bot_token ? "••••••••" + botData.bot_token.slice(-8) : null,
     bot_token_set: !!botData.bot_token,
   };
 
-  return NextResponse.json(maskedData);
-}
+  // Include AI usage quota for the current plan
+  try {
+    const admin = createAdminClient();
+    const usage = await getAiUsage(admin, user.id);
+    maskedData.ai_usage = usage;
+  } catch {
+    // Usage table might not exist yet; omit it
+  }
 
-// PUT update user settings
+  return NextResponse.json(maskedData);
+}// PUT update user settings
 export async function PUT(req: Request) {
   const supabase = await createClient();
 
@@ -67,10 +76,14 @@ export async function PUT(req: Request) {
   }
 
   const body = await req.json();
-  const { business_name, system_prompt, working_hours, bot_token, bot_username } = body;
+  const { business_name, business_description, business_address, business_phone, business_email, system_prompt, working_hours, bot_token, bot_username } = body;
 
   const updateData: Record<string, unknown> = {};
   if (business_name !== undefined) updateData.business_name = business_name;
+  if (business_description !== undefined) updateData.business_description = business_description;
+  if (business_address !== undefined) updateData.business_address = business_address;
+  if (business_phone !== undefined) updateData.business_phone = business_phone;
+  if (business_email !== undefined) updateData.business_email = business_email;
   if (system_prompt !== undefined) updateData.system_prompt = system_prompt;
   if (working_hours !== undefined) updateData.working_hours = working_hours;
 
@@ -97,7 +110,7 @@ export async function PUT(req: Request) {
     .from("users")
     .update(updateData)
     .eq("id", user.id)
-    .select("business_name, system_prompt, working_hours")
+    .select("business_name, business_description, business_address, business_phone, business_email, system_prompt, working_hours")
     .single();
 
   if (error) {
@@ -105,6 +118,10 @@ export async function PUT(req: Request) {
     if (error.message.includes("column") || error.message.includes("bot_")) {
       const basicData: Record<string, unknown> = {};
       if (business_name !== undefined) basicData.business_name = business_name;
+      if (business_description !== undefined) basicData.business_description = business_description;
+      if (business_address !== undefined) basicData.business_address = business_address;
+      if (business_phone !== undefined) basicData.business_phone = business_phone;
+      if (business_email !== undefined) basicData.business_email = business_email;
       if (system_prompt !== undefined) basicData.system_prompt = system_prompt;
       if (working_hours !== undefined) basicData.working_hours = working_hours;
 
@@ -112,7 +129,7 @@ export async function PUT(req: Request) {
         .from("users")
         .update(basicData)
         .eq("id", user.id)
-        .select("business_name, system_prompt, working_hours")
+        .select("business_name, business_description, business_address, business_phone, business_email, system_prompt, working_hours")
         .single();
 
       if (retryError) {
