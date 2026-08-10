@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -166,10 +167,8 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white">
-              <Bot className="h-5 w-5" />
-            </div>
-            <span className="text-lg font-bold text-gray-900">BookBot</span>
+            <Image src="/slot-logo.svg" alt="Slot" width={32} height={32} />
+            <span className="text-lg font-bold text-gray-900">Slot</span>
           </div>
           <nav className="hidden items-center gap-8 text-sm text-gray-600 md:flex">
             <a href="#features" className="hover:text-gray-900">Возможности</a>
@@ -554,13 +553,11 @@ export default function Home() {
       <footer className="border-t border-gray-100 py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row">
           <div className="flex items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white">
-              <Bot className="h-4 w-4" />
-            </div>
-            <span className="font-semibold text-gray-900">BookBot</span>
+            <Image src="/slot-logo.svg" alt="Slot" width={28} height={28} />
+            <span className="font-semibold text-gray-900">Slot</span>
           </div>
           <p className="text-sm text-gray-500">
-            © {new Date().getFullYear()} BookBot. Все права защищены.
+            © {new Date().getFullYear()} Slot. Все права защищены.
           </p>
           <nav className="flex gap-6 text-sm text-gray-500">
             <a href="#features" className="hover:text-gray-900">Возможности</a>
