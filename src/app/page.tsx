@@ -344,6 +344,55 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ============ PRODUCT SHOWCASE ============ */}
+      <section className="mx-auto max-w-6xl px-4 py-20">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
+            Так это выглядит у ваших клиентов
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-gray-600">
+            Реальные экраны: приветствие бота, выбор времени и живой диалог с
+            ИИ-ассистентом. Всё внутри Telegram — ничего устанавливать не нужно.
+          </p>
+        </div>
+        <div className="mt-14 grid grid-cols-1 gap-10 md:grid-cols-3">
+          {[
+            {
+              img: "/screenshot-bot-chat.svg",
+              title: "Бот приветствует клиента",
+              desc: "Кнопки-подсказки ведут клиента: услуги, информация, запись.",
+            },
+            {
+              img: "/screenshot-booking.svg",
+              title: "Выбор свободного времени",
+              desc: "Клиент видит только свободные слоты и записывается в два касания.",
+            },
+            {
+              img: "/screenshot-ai-chat.svg",
+              title: "ИИ-ассистент ведёт диалог",
+              desc: "Отвечает на вопросы, подбирает услуги и записывает клиента 24/7.",
+            },
+          ].map((s) => (
+            <div
+              key={s.title}
+              className="flex flex-col items-center rounded-2xl border border-gray-100 bg-gray-50/50 p-6 transition-shadow hover:shadow-xl"
+            >
+              <Image
+                src={s.img}
+                alt={s.title}
+                width={270}
+                height={548}
+                className="rounded-[24px] shadow-lg"
+              />
+              <h3 className="mt-6 text-center text-lg font-semibold text-gray-900">
+                {s.title}
+              </h3>
+              <p className="mt-2 text-center text-sm text-gray-600">{s.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* ============ USE CASES ============ */}
       <section id="cases" className="mx-auto max-w-6xl px-4 py-20">
         <div className="text-center">

@@ -1,0 +1,56 @@
+<svg width="375" height="760" viewBox="0 0 375 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Phone frame -->
+  <rect x="4" y="4" width="367" height="752" rx="40" fill="#1B1B1F" stroke="#3A3A40" stroke-width="4"/>
+  <!-- Screen -->
+  <rect x="16" y="16" width="343" height="728" rx="32" fill="#FFFFFF"/>
+  <!-- Status bar -->
+  <text x="36" y="42" font-family="Arial, sans-serif" font-size="14" fill="#1B1B1F">9:41</text>
+  <!-- Chat header -->
+  <rect x="16" y="56" width="343" height="60" fill="#0088CC" fill-opacity="0.06"/>
+  <circle cx="50" cy="86" r="18" fill="#0088CC"/>
+  <path d="M38 88h24M50 76c-4.5 0-8 3.6-8 8v1h16v-1c0-4.4-3.5-8-8-8z" fill="white"/>
+  <text x="76" y="82" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#111">Салон красоты «Аврора»</text>
+  <text x="76" y="100" font-family="Arial, sans-serif" font-size="12" fill="#7A7A7A">онлайн • ИИ-ассистент</text>
+  <!-- Chat background -->
+  <rect x="16" y="116" width="343" height="560" fill="#E6EBF0"/>
+  <!-- User question -->
+  <rect x="120" y="130" width="225" height="70" rx="14" fill="#0088CC"/>
+  <text x="138" y="152" font-family="Arial, sans-serif" font-size="14" fill="#FFFFFF">Здравствуйте! Хочу освежить</text>
+  <text x="138" y="172" font-family="Arial, sans-serif" font-size="14" fill="#FFFFFF">цвет к лету. Что посоветуете?</text>
+  <text x="318" y="192" font-family="Arial, sans-serif" font-size="11" fill="#B7E3FA">14:06</text>
+  <!-- AI typing indicator -->
+  <rect x="30" y="216" width="120" height="40" rx="14" fill="#FFFFFF" stroke="#000000" stroke-opacity="0.05"/>
+  <circle cx="55" cy="236" r="5" fill="#C0C0C0"/>
+  <circle cx="75" cy="236" r="5" fill="#C0C0C0" fill-opacity="0.6"/>
+  <circle cx="95" cy="236" r="5" fill="#C0C0C0" fill-opacity="0.3"/>
+  <!-- AI answer -->
+  <rect x="30" y="272" width="300" height="180" rx="14" fill="#FFFFFF" stroke="#000000" stroke-opacity="0.05"/>
+  <text x="46" y="296" font-family="Arial, sans-serif" font-size="14" fill="#111">Здравствуйте, Анна! 👋</text>
+  <text x="46" y="322" font-family="Arial, sans-serif" font-size="14" fill="#111">Для лёгкого освежения к лету</text>
+  <text x="46" y="342" font-family="Arial, sans-serif" font-size="14" fill="#111">отлично подойдёт:</text>
+  <text x="46" y="372" font-family="Arial, sans-serif" font-size="14" fill="#0088CC">✨ Тонирование — 4500 ₽, 2 часа</text>
+  <text x="46" y="396" font-family="Arial, sans-serif" font-size="14" fill="#0088CC">✨ Ботокс для волос — 3500 ₽</text>
+  <text x="46" y="428" font-family="Arial, sans-serif" font-size="14" fill="#666">Есть свободное окно в четверг в</text>
+  <text x="46" y="448" font-family="Arial, sans-serif" font-size="14" fill="#666">19:00. Записать вас? 💆♀️</text>
+  <text x="300" y="446" font-family="Arial, sans-serif" font-size="11" fill="#8A8A8A">14:06</text>
+  <!-- Inline buttons -->
+  <rect x="30" y="468" width="152" height="46" rx="12" fill="#0088CC"/>
+  <text x="106" y="497" font-family="Arial, sans-serif" font-size="14" fill="#FFFFFF" text-anchor="middle">✅ Да, записать</text>
+  <rect x="190" y="468" width="140" height="46" rx="12" fill="#FFFFFF" stroke="#0088CC"/>
+  <text x="260" y="497" font-family="Arial, sans-serif" font-size="14" fill="#0088CC" text-anchor="middle">Показать ещё</text>
+  <!-- User confirmation -->
+  <rect x="150" y="530" width="195" height="56" rx="14" fill="#0088CC"/>
+  <text x="168" y="552" font-family="Arial, sans-serif" font-size="14" fill="#FFFFFF">Да, запишите меня на</text>
+  <text x="168" y="572" font-family="Arial, sans-serif" font-size="14" fill="#FFFFFF">тонирование в четверг 👍</text>
+  <text x="318" y="578" font-family="Arial, sans-serif" font-size="11" fill="#B7E3FA">14:07</text>
+  <!-- AI confirmation -->
+  <rect x="30" y="602" width="290" height="70" rx="14" fill="#FFFFFF" stroke="#000000" stroke-opacity="0.05"/>
+  <text x="46" y="626" font-family="Arial, sans-serif" font-size="14" fill="#111">Готово! Запись подтверждена:</text>
+  <text x="46" y="650" font-family="Arial, sans-serif" font-size="14" fill="#0088CC">Чт 21 авг, 19:00 • Тонирование</text>
+  <text x="292" y="664" font-family="Arial, sans-serif" font-size="11" fill="#8A8A8A">14:07</text>
+  <!-- Input bar -->
+  <rect x="16" y="676" width="343" height="68" fill="#FFFFFF" stroke="#E0E0E0"/>
+  <rect x="28" y="692" width="300" height="36" rx="18" fill="#F0F0F0"/>
+  <text x="44" y="715" font-family="Arial, sans-serif" font-size="14" fill="#999">Сообщение</text>
+  <path d="M316 710l18 0-3 12-6-6z" fill="#0088CC"/>
+</svg>

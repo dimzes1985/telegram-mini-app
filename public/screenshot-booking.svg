@@ -1,0 +1,97 @@
+<svg width="375" height="760" viewBox="0 0 375 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Phone frame -->
+  <rect x="4" y="4" width="367" height="752" rx="40" fill="#1B1B1F" stroke="#3A3A40" stroke-width="4"/>
+  <!-- Screen -->
+  <rect x="16" y="16" width="343" height="728" rx="32" fill="#FFFFFF"/>
+  <!-- Telegram mini app header -->
+  <rect x="16" y="16" width="343" height="52" fill="#0088CC"/>
+  <circle cx="44" cy="42" r="14" fill="white"/>
+  <path d="M36 44h16M44 34c-3.2 0-5.7 2.6-5.7 5.7v.6h11.4v-.6c0-3.1-2.5-5.7-5.7-5.7z" fill="#0088CC"/>
+  <text x="66" y="47" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#FFFFFF">Салон красоты «Аврора»</text>
+  <text x="341" y="34" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="end">✕</text>
+  <!-- Booking title -->
+  <text x="32" y="100" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#111">Выбор времени</text>
+  <text x="32" y="124" font-family="Arial, sans-serif" font-size="13" fill="#666">💅 Маникюр классический</text>
+  <text x="32" y="142" font-family="Arial, sans-serif" font-size="13" fill="#666">1500 ₽ • 60 мин</text>
+  <!-- Calendar month header -->
+  <text x="188" y="180" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#111" text-anchor="middle">Август 2026</text>
+  <text x="330" y="180" font-family="Arial, sans-serif" font-size="18" fill="#0088CC" text-anchor="end">›</text>
+  <text x="48" y="180" font-family="Arial, sans-serif" font-size="18" fill="#0088CC">‹</text>
+  <!-- Weekday header -->
+  <text x="50" y="208" font-family="Arial, sans-serif" font-size="12" fill="#999" text-anchor="middle">Пн</text>
+  <text x="95" y="208" font-family="Arial, sans-serif" font-size="12" fill="#999" text-anchor="middle">Вт</text>
+  <text x="140" y="208" font-family="Arial, sans-serif" font-size="12" fill="#999" text-anchor="middle">Ср</text>
+  <text x="185" y="208" font-family="Arial, sans-serif" font-size="12" fill="#999" text-anchor="middle">Чт</text>
+  <text x="230" y="208" font-family="Arial, sans-serif" font-size="12" fill="#999" text-anchor="middle">Пт</text>
+  <text x="275" y="208" font-family="Arial, sans-serif" font-size="12" fill="#999" text-anchor="middle">Сб</text>
+  <text x="320" y="208" font-family="Arial, sans-serif" font-size="12" fill="#C0C0C0" text-anchor="middle">Вс</text>
+  <!-- Calendar grid (5 rows x 7 cols) -->
+  <g font-family="Arial, sans-serif" font-size="13" text-anchor="middle">
+    <text x="50" y="245" fill="#C0C0C0">27</text>
+    <text x="95" y="245" fill="#C0C0C0">28</text>
+    <text x="140" y="245" fill="#C0C0C0">29</text>
+    <text x="185" y="245" fill="#C0C0C0">30</text>
+    <text x="230" y="245" fill="#C0C0C0">31</text>
+    <text x="275" y="245" fill="#111">1</text>
+    <text x="320" y="245" fill="#C0C0C0">2</text>
+
+    <text x="50" y="290" fill="#111">3</text>
+    <text x="95" y="290" fill="#111">4</text>
+    <text x="140" y="290" fill="#111">5</text>
+    <text x="185" y="290" fill="#111">6</text>
+    <text x="230" y="290" fill="#111">7</text>
+    <text x="275" y="290" fill="#111">8</text>
+    <text x="320" y="290" fill="#C0C0C0">9</text>
+
+    <text x="50" y="335" fill="#111">10</text>
+    <text x="95" y="335" fill="#111">11</text>
+    <text x="140" y="335" fill="#111">12</text>
+    <text x="185" y="335" fill="#111">13</text>
+    <text x="230" y="335" fill="#111">14</text>
+    <text x="275" y="335" fill="#111">15</text>
+    <text x="320" y="335" fill="#C0C0C0">16</text>
+
+    <text x="50" y="380" fill="#111">17</text>
+    <text x="95" y="380" fill="#111">18</text>
+    <text x="140" y="380" fill="#111">19</text>
+    <text x="185" y="380" fill="#111">20</text>
+    <text x="230" y="380" fill="#111">21</text>
+    <text x="275" y="380" fill="#111">22</text>
+    <text x="320" y="380" fill="#C0C0C0">23</text>
+
+    <text x="50" y="425" fill="#111">24</text>
+    <text x="95" y="425" fill="#111">25</text>
+    <text x="140" y="425" fill="#111">26</text>
+    <text x="185" y="425" fill="#111">27</text>
+    <text x="230" y="425" fill="#111">28</text>
+    <text x="275" y="425" fill="#111">29</text>
+    <text x="320" y="425" fill="#C0C0C0">30</text>
+
+    <text x="50" y="470" fill="#C0C0C0">31</text>
+  </g>
+  <!-- Selected day highlight -->
+  <circle cx="275" cy="414" r="18" fill="#0088CC"/>
+  <text x="275" y="420" font-family="Arial, sans-serif" font-size="13" fill="#FFFFFF" text-anchor="middle">29</text>
+  <!-- Time slots -->
+  <text x="32" y="508" font-family="Arial, sans-serif" font-size="15" font-weight="bold" fill="#111">Суббота, 29 августа</text>
+  <g>
+    <rect x="32" y="522" width="85" height="44" rx="10" fill="#F0F4F8" stroke="#E0E0E0"/>
+    <text x="74" y="550" font-family="Arial, sans-serif" font-size="13" fill="#0088CC" text-anchor="middle">10:00</text>
+    <rect x="125" y="522" width="85" height="44" rx="10" fill="#F0F4F8" stroke="#E0E0E0"/>
+    <text x="167" y="550" font-family="Arial, sans-serif" font-size="13" fill="#0088CC" text-anchor="middle">12:30</text>
+    <rect x="218" y="522" width="85" height="44" rx="10" fill="#0088CC"/>
+    <text x="260" y="550" font-family="Arial, sans-serif" font-size="13" fill="#FFFFFF" text-anchor="middle">15:00</text>
+  </g>
+  <g>
+    <rect x="32" y="574" width="85" height="44" rx="10" fill="#F0F4F8" stroke="#E0E0E0"/>
+    <text x="74" y="602" font-family="Arial, sans-serif" font-size="13" fill="#0088CC" text-anchor="middle">18:00</text>
+    <rect x="125" y="574" width="85" height="44" rx="10" fill="#F5F5F5" stroke="#ECECEC"/>
+    <text x="167" y="602" font-family="Arial, sans-serif" font-size="13" fill="#C0C0C0" text-anchor="middle">19:30</text>
+    <rect x="218" y="574" width="85" height="44" rx="10" fill="#F5F5F5" stroke="#ECECEC"/>
+    <text x="260" y="602" font-family="Arial, sans-serif" font-size="13" fill="#C0C0C0" text-anchor="middle">21:00</text>
+  </g>
+  <text x="32" y="636" font-family="Arial, sans-serif" font-size="12" fill="#999">Выбрано: 29 августа, 15:00</text>
+  <!-- Confirm button -->
+  <rect x="32" y="652" width="311" height="52" rx="12" fill="#0088CC"/>
+  <text x="188" y="685" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#FFFFFF" text-anchor="middle">Подтвердить запись</text>
+</svg>
