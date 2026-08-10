@@ -167,8 +167,7 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <Image src="/slot-logo.svg" alt="Slot" width={32} height={32} />
-            <span className="text-lg font-bold text-gray-900">Slot</span>
+            <Image src="/slot-wordmark.svg" alt="Slot" width={132} height={36} />
           </div>
           <nav className="hidden items-center gap-8 text-sm text-gray-600 md:flex">
             <a href="#features" className="hover:text-gray-900">Возможности</a>
@@ -602,8 +601,7 @@ export default function Home() {
       <footer className="border-t border-gray-100 py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row">
           <div className="flex items-center gap-2">
-            <Image src="/slot-logo.svg" alt="Slot" width={28} height={28} />
-            <span className="font-semibold text-gray-900">Slot</span>
+            <Image src="/slot-wordmark.svg" alt="Slot" width={110} height={30} />
           </div>
           <p className="text-sm text-gray-500">
             © {new Date().getFullYear()} Slot. Все права защищены.
