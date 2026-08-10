@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI-Powered CRM & Booking System",
-  description: "Telegram Mini App for small business booking management",
+  title: "BookBot — запись клиентов в Telegram",
+  description:
+    "Готовая система бронирования и ИИ-менеджер для салонов, мастерских и любых бизнесов с записью. Клиенты записываются прямо в вашем Telegram-боте, 24/7.",
 };
 
 export default function RootLayout({
