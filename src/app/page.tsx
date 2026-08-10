@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -157,6 +157,50 @@ const USE_CASES = [
   },
 ];
 
+// Reveal-on-scroll hook and wrapper
+function useReveal() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("reveal-visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return ref;
+}
+
+function Reveal({
+  children,
+  className = "",
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+}) {
+  const ref = useReveal();
+  return (
+    <div
+      ref={ref}
+      className={`reveal ${className}`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function Home() {
   const [yearly, setYearly] = useState(true);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -167,7 +211,13 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <Image src="/slot-wordmark.svg" alt="Slot" width={132} height={36} />
+            <Image
+              src="/slot-wordmark.svg"
+              alt="Slot"
+              width={132}
+              height={36}
+              className="logo-shimmer cursor-pointer"
+            />
           </div>
           <nav className="hidden items-center gap-8 text-sm text-gray-600 md:flex">
             <a href="#features" className="hover:text-gray-900">Возможности</a>
@@ -189,25 +239,29 @@ export default function Home() {
       {/* ============ HERO ============ */}
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-blue-50 via-white to-white" />
-        <div className="pointer-events-none absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-blue-200/40 blur-3xl" />
+        <div className="animate-float-slow pointer-events-none absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-blue-200/40 blur-3xl" />
+        <div className="animate-float-slower pointer-events-none absolute -right-32 top-40 h-80 w-80 rounded-full bg-purple-200/40 blur-3xl" />
+        <div className="animate-float-slow pointer-events-none absolute -left-32 bottom-0 h-72 w-72 rounded-full bg-pink-200/30 blur-3xl" />
         <div className="relative mx-auto max-w-6xl px-4 pb-20 pt-16 text-center">
-          <Badge variant="secondary" className="mb-6 gap-1.5 px-3 py-1.5 text-sm">
-            <Sparkles className="h-3.5 w-3.5 text-blue-600" />
-            ИИ-ассистент для вашего бизнеса уже в Telegram
-          </Badge>
-          <h1 className="mx-auto max-w-3xl text-4xl font-bold leading-tight tracking-tight text-gray-900 md:text-6xl">
+          <div className="hero-in">
+            <Badge variant="secondary" className="mb-6 gap-1.5 px-3 py-1.5 text-sm">
+              <Sparkles className="h-3.5 w-3.5 text-blue-600" />
+              ИИ-ассистент для вашего бизнеса уже в Telegram
+            </Badge>
+          </div>
+          <h1 className="hero-in-delay-1 mx-auto max-w-3xl text-4xl font-bold leading-tight tracking-tight text-gray-900 md:text-6xl">
             Запись клиентов в Telegram{" "}
-            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <span className="text-gradient font-extrabold">
               без звонков и администратора
             </span>
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-gray-600">
+          <p className="hero-in-delay-2 mx-auto mt-6 max-w-2xl text-lg text-gray-600">
             Готовая система бронирования + ИИ-менеджер на базе GPT-4o. Клиенты
             видят услуги, выбирают свободное время и записываются — прямо в вашем
             боте. Работает 24/7, вы платите только когда растёте.
           </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button size="lg" className="h-12 px-8 text-base" render={<Link href="/login" />}>
+          <div className="hero-in-delay-3 mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Button size="lg" className="animate-glow h-12 px-8 text-base" render={<Link href="/login" />}>
               Начать бесплатно
               <ArrowRight className="ml-1" />
             </Button>
@@ -215,7 +269,7 @@ export default function Home() {
               Как это работает
             </Button>
           </div>
-          <p className="mt-4 text-sm text-gray-500">
+          <p className="hero-in-delay-3 mt-4 text-sm text-gray-500">
             Бесплатный план — без карты и обязательств
           </p>
 
@@ -226,7 +280,7 @@ export default function Home() {
               { num: "24/7", label: "приём записей" },
               { num: "0 ₽", label: "старт бесплатно" },
             ].map((s) => (
-              <div key={s.label} className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div key={s.label} className="card-hover rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
                 <div className="text-3xl font-bold text-gray-900">{s.num}</div>
                 <div className="mt-1 text-sm text-gray-500">{s.label}</div>
               </div>
@@ -235,9 +289,36 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ============ MARQUEE ============ */}
+      <div className="marquee-mask overflow-hidden border-y border-gray-100 bg-gray-50/60 py-4">
+        <div className="animate-marquee flex w-max gap-10 whitespace-nowrap">
+          {[0, 1].map((dup) => (
+            <div key={dup} className="flex gap-10" aria-hidden={dup === 1}>
+              {[
+                "⚡ Запись за 30 секунд",
+                "🤖 ИИ-ассистент 24/7",
+                "📱 Работает прямо в Telegram",
+                "🛡 Защита данных клиентов",
+                "💳 Оплата подписок онлайн",
+                "📊 Аналитика в кабинете",
+                "🚀 Запуск за один вечер",
+              ].map((item) => (
+                <span
+                  key={item}
+                  className="flex items-center gap-10 text-sm font-medium text-gray-500"
+                >
+                  {item}
+                  <span className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-600" />
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* ============ FEATURES ============ */}
       <section id="features" className="mx-auto max-w-6xl px-4 py-20">
-        <div className="text-center">
+        <Reveal className="text-center">
           <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
             Всё для записи — в одном месте
           </h2>
@@ -245,7 +326,7 @@ export default function Home() {
             Ваш салон или мастерская получает полноценную CRM и онлайн-запись без
             дорогой разработки.
           </p>
-        </div>
+        </Reveal>
 
         <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {[
@@ -285,10 +366,10 @@ export default function Home() {
               desc: "Начните бесплатно. Переходите на платный план, когда бизнес растёт. Отмена — в один клик.",
               color: "bg-cyan-50 text-cyan-600",
             },
-          ].map((f) => (
+          ].map((f, idx) => (
             <div
               key={f.title}
-              className="rounded-2xl border border-gray-100 p-6 transition-shadow hover:shadow-lg"
+              className={`card-hover rounded-2xl border border-gray-100 p-6 shadow-sm transition-shadow hover:shadow-lg ${idx < 6 ? `stagger-${idx + 1}` : ""}`}
             >
               <div className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl ${f.color}`}>
                 {f.icon}
@@ -303,7 +384,7 @@ export default function Home() {
       {/* ============ HOW IT WORKS ============ */}
       <section id="how" className="bg-gray-50 py-20">
         <div className="mx-auto max-w-6xl px-4">
-          <div className="text-center">
+          <Reveal className="text-center">
             <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
               Запуск за один вечер
             </h2>
@@ -311,7 +392,7 @@ export default function Home() {
               Никакой настройки серверов и программистов. Три простых шага — и вы
               принимаете записи.
             </p>
-          </div>
+          </Reveal>
 
           <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-3">
             {[
@@ -330,9 +411,12 @@ export default function Home() {
                 title: "Принимайте записи",
                 desc: "Отправьте клиентам ссылку на бота. Они записываются сами — вы только подтверждаете.",
               },
-            ].map((s) => (
-              <div key={s.step} className="relative rounded-2xl bg-white p-8 shadow-sm">
-                <div className="absolute -top-4 left-8 flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-base font-bold text-white">
+            ].map((s, idx) => (
+              <div
+                key={s.step}
+                className={`relative rounded-2xl bg-white p-8 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg ${idx < 3 ? `stagger-${idx + 1}` : ""}`}
+              >
+                <div className="absolute -top-4 left-8 flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-base font-bold text-white">
                   {s.step}
                 </div>
                 <h3 className="mt-4 text-lg font-semibold text-gray-900">{s.title}</h3>
@@ -345,7 +429,7 @@ export default function Home() {
 
       {/* ============ PRODUCT SHOWCASE ============ */}
       <section className="mx-auto max-w-6xl px-4 py-20">
-        <div className="text-center">
+        <Reveal className="text-center">
           <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
             Так это выглядит у ваших клиентов
           </h2>
@@ -353,7 +437,7 @@ export default function Home() {
             Реальные экраны: приветствие бота, выбор времени и живой диалог с
             ИИ-ассистентом. Всё внутри Telegram — ничего устанавливать не нужно.
           </p>
-        </div>
+        </Reveal>
         <div className="mt-14 grid grid-cols-1 gap-10 md:grid-cols-3">
           {[
             {
@@ -371,42 +455,43 @@ export default function Home() {
               title: "ИИ-ассистент ведёт диалог",
               desc: "Отвечает на вопросы, подбирает услуги и записывает клиента 24/7.",
             },
-          ].map((s) => (
-            <div
+          ].map((s, idx) => (
+            <Reveal
               key={s.title}
-              className="flex flex-col items-center rounded-2xl border border-gray-100 bg-gray-50/50 p-6 transition-shadow hover:shadow-xl"
+              delay={idx * 120}
+              className="flex flex-col items-center rounded-2xl border border-gray-100 bg-gray-50/50 p-6 transition-all hover:-translate-y-1.5 hover:shadow-2xl"
             >
               <Image
                 src={s.img}
                 alt={s.title}
                 width={270}
                 height={548}
-                className="rounded-[24px] shadow-lg"
+                className="rounded-[24px] shadow-lg transition-transform duration-500 hover:scale-[1.03]"
               />
               <h3 className="mt-6 text-center text-lg font-semibold text-gray-900">
                 {s.title}
               </h3>
               <p className="mt-2 text-center text-sm text-gray-600">{s.desc}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
 
       {/* ============ USE CASES ============ */}
       <section id="cases" className="mx-auto max-w-6xl px-4 py-20">
-        <div className="text-center">
+        <Reveal className="text-center">
           <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
             Кому это подходит
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-gray-600">
             Всё, что работает по записи — теперь работает в Telegram.
           </p>
-        </div>
+        </Reveal>
         <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {USE_CASES.map((c) => (
+          {USE_CASES.map((c, idx) => (
             <div
               key={c.title}
-              className="group rounded-2xl border border-gray-100 p-6 transition-all hover:-translate-y-1 hover:border-blue-200 hover:shadow-lg"
+              className={`group rounded-2xl border border-gray-100 p-6 transition-all hover:-translate-y-1 hover:border-blue-200 hover:shadow-lg ${idx < 6 ? `stagger-${idx + 1}` : ""}`}
             >
               <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-700 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600">
                 {c.icon}
@@ -421,7 +506,7 @@ export default function Home() {
       {/* ============ PRICING ============ */}
       <section id="pricing" className="bg-gradient-to-b from-blue-50/60 to-white py-20">
         <div className="mx-auto max-w-6xl px-4">
-          <div className="text-center">
+          <Reveal className="text-center">
             <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
               Тарифы, которые растут вместе с вами
             </h2>
@@ -452,19 +537,19 @@ export default function Home() {
                 </span>
               </button>
             </div>
-          </div>
+          </Reveal>
 
           <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-3">
-            {PLANS.map((plan) => {
+            {PLANS.map((plan, idx) => {
               const price = yearly ? plan.priceYearly : plan.price;
               return (
                 <div
                   key={plan.id}
-                  className={`relative flex flex-col rounded-2xl p-8 ${
+                  className={`card-hover relative flex flex-col rounded-2xl p-8 ${
                     plan.featured
                       ? "border-2 border-blue-600 bg-white shadow-xl"
-                      : "border border-gray-200 bg-white"
-                  }`}
+                      : "border border-gray-200 bg-white shadow-sm"
+                  } ${idx < 3 ? `stagger-${idx + 1}` : ""}`}
                 >
                   {plan.featured && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-4 py-1 text-xs font-semibold text-white">
@@ -511,17 +596,17 @@ export default function Home() {
 
       {/* ============ TESTIMONIALS ============ */}
       <section className="mx-auto max-w-6xl px-4 py-20">
-        <div className="text-center">
+        <Reveal className="text-center">
           <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
             Что говорят клиенты
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-gray-600">
             Реальные истории бизнесов, которые перешли на запись через Telegram.
           </p>
-        </div>
+        </Reveal>
         <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
-          {TESTIMONIALS.map((t) => (
-            <div key={t.name} className="flex flex-col rounded-2xl border border-gray-100 bg-gray-50/50 p-6">
+          {TESTIMONIALS.map((t, idx) => (
+            <Reveal key={t.name} delay={idx * 120} className="card-hover flex flex-col rounded-2xl border border-gray-100 bg-gray-50/50 p-6 shadow-sm">
               <div className="mb-3 flex gap-0.5">
                 {Array.from({ length: t.stars }).map((_, i) => (
                   <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
@@ -529,7 +614,7 @@ export default function Home() {
               </div>
               <p className="flex-1 text-sm text-gray-700">«{t.text}»</p>
               <div className="mt-4 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-sm font-semibold text-white">
                   {t.name[0]}
                 </div>
                 <div>
@@ -537,21 +622,25 @@ export default function Home() {
                   <div className="text-xs text-gray-500">{t.role}</div>
                 </div>
               </div>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
 
       {/* ============ FAQ ============ */}
       <section className="mx-auto max-w-3xl px-4 pb-20">
-        <div className="text-center">
+        <Reveal className="text-center">
           <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
             Частые вопросы
           </h2>
-        </div>
+        </Reveal>
         <div className="mt-10 space-y-3">
           {FAQ_ITEMS.map((item, i) => (
-            <div key={i} className="overflow-hidden rounded-xl border border-gray-200">
+            <Reveal
+              key={i}
+              delay={i * 60}
+              className="overflow-hidden rounded-xl border border-gray-200 transition-all"
+            >
               <button
                 onClick={() => setOpenFaq(openFaq === i ? null : i)}
                 className="flex w-full items-center justify-between px-5 py-4 text-left"
@@ -568,33 +657,36 @@ export default function Home() {
                   {item.a}
                 </div>
               )}
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
 
       {/* ============ FINAL CTA ============ */}
       <section className="mx-auto max-w-6xl px-4 pb-20">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-16 text-center">
-          <div className="pointer-events-none absolute -top-20 right-0 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-          <h2 className="relative mx-auto max-w-2xl text-3xl font-bold text-white md:text-4xl">
-            Готовы принимать записи уже сегодня?
-          </h2>
-          <p className="relative mx-auto mt-4 max-w-xl text-blue-100">
-            Подключите бесплатный план за 5 минут. Без карты, без обязательств,
-            без скрытых платежей.
-          </p>
-          <div className="relative mt-8">
-            <Button
-              size="lg"
-              className="h-12 bg-white px-8 text-base text-blue-700 hover:bg-blue-50"
-              render={<Link href="/login" />}
-            >
-              Начать бесплатно
-              <ArrowRight className="ml-1" />
-            </Button>
+        <Reveal>
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-16 text-center">
+            <div className="animate-float-slow pointer-events-none absolute -top-20 right-0 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+            <div className="animate-float-slower pointer-events-none absolute -bottom-24 left-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+            <h2 className="relative mx-auto max-w-2xl text-3xl font-bold text-white md:text-4xl">
+              Готовы принимать записи уже сегодня?
+            </h2>
+            <p className="relative mx-auto mt-4 max-w-xl text-blue-100">
+              Подключите бесплатный план за 5 минут. Без карты, без обязательств,
+              без скрытых платежей.
+            </p>
+            <div className="relative mt-8">
+              <Button
+                size="lg"
+                className="animate-glow h-12 bg-white px-8 text-base text-blue-700 hover:bg-blue-50"
+                render={<Link href="/login" />}
+              >
+                Начать бесплатно
+                <ArrowRight className="ml-1" />
+              </Button>
+            </div>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* ============ FOOTER ============ */}
