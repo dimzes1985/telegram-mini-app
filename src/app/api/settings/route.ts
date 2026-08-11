@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAiUsage } from "@/lib/ai-usage";
+import { getMaxBotInfo } from "@/lib/max-bot";
 
 // GET user settings
 export async function GET() {
@@ -45,12 +46,34 @@ export async function GET() {
     // Columns might not exist yet
   }
 
+  // Try to get MAX bot columns (might not exist yet)
+  let maxBotData: { max_bot_token: string | null; max_bot_username: string | null; max_bot_webhook_set: boolean } = { max_bot_token: null, max_bot_username: null, max_bot_webhook_set: false };
+  try {
+    const { data: maxBotResult } = await supabase
+      .from("users")
+      .select("max_bot_token, max_bot_username, max_bot_webhook_set")
+      .eq("id", user.id)
+      .single();
+    if (maxBotResult) {
+      maxBotData = {
+        max_bot_token: maxBotResult.max_bot_token,
+        max_bot_username: maxBotResult.max_bot_username,
+        max_bot_webhook_set: maxBotResult.max_bot_webhook_set || false,
+      };
+    }
+  } catch {
+    // Columns might not exist yet
+  }
+
   // Mask bot token for security
   const maskedData: Record<string, unknown> = {
     ...data,
     ...botData,
+    ...maxBotData,
     bot_token: botData.bot_token ? "••••••••" + botData.bot_token.slice(-8) : null,
     bot_token_set: !!botData.bot_token,
+    max_bot_token: maxBotData.max_bot_token ? "••••••••" + maxBotData.max_bot_token.slice(-8) : null,
+    max_bot_token_set: !!maxBotData.max_bot_token,
   };
 
   // Include AI usage quota for the current plan
@@ -76,7 +99,7 @@ export async function PUT(req: Request) {
   }
 
   const body = await req.json();
-  const { business_name, business_description, business_address, business_phone, business_email, system_prompt, working_hours, bot_token, bot_username } = body;
+  const { business_name, business_description, business_address, business_phone, business_email, system_prompt, working_hours, bot_token, bot_username, max_bot_token, max_bot_username } = body;
 
   const updateData: Record<string, unknown> = {};
   if (business_name !== undefined) updateData.business_name = business_name;
@@ -104,6 +127,20 @@ export async function PUT(req: Request) {
     }
   }
   if (bot_username !== undefined) updateData.bot_username = bot_username;
+
+  // Handle MAX bot token - only update if it's not the masked value
+  if (max_bot_token !== undefined && max_bot_token && !max_bot_token.startsWith("••••")) {
+    updateData.max_bot_token = max_bot_token;
+    updateData.max_bot_webhook_set = false;
+    // Resolve the bot public name from the MAX API
+    try {
+      const info = await getMaxBotInfo(max_bot_token);
+      updateData.max_bot_username = info.username || max_bot_username || null;
+    } catch {
+      if (max_bot_username !== undefined) updateData.max_bot_username = max_bot_username;
+    }
+  }
+  if (max_bot_username !== undefined) updateData.max_bot_username = max_bot_username;
 
   // Try to update with all data
   const { data, error } = await supabase

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyInitData } from "@/lib/telegram-auth";
+import { verifyMaxInitData } from "@/lib/max-auth";
 import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
     customer_phone,
     customer_notes,
     initData,
+    platform = "telegram",
   } = body;
 
   if (!service_id || !user_id || !booking_date || !booking_time || !customer_name) {
@@ -58,26 +60,31 @@ export async function POST(req: Request) {
 
   if (!initData) {
     return NextResponse.json(
-      { error: "Telegram initData required" },
+      { error: "initData required" },
       { status: 401 }
     );
   }
 
-  // Load the business bot token to verify the caller
+  // Load the business bot token(s) to verify the caller
   const { data: business } = await supabase
     .from("users")
-    .select("bot_token, working_hours")
+    .select("bot_token, max_bot_token, working_hours")
     .eq("id", user_id)
     .single();
 
-  if (!business?.bot_token) {
+  const isMax = platform === "max";
+  const botToken = isMax ? business?.max_bot_token : business?.bot_token;
+
+  if (!botToken) {
     return NextResponse.json(
-      { error: "Business has no bot configured" },
+      { error: isMax ? "Business has no MAX bot configured" : "Business has no bot configured" },
       { status: 403 }
     );
   }
 
-  const verification = verifyInitData(initData, business.bot_token);
+  const verification = isMax
+    ? verifyMaxInitData(initData, botToken)
+    : verifyInitData(initData, botToken);
   if (!verification.valid) {
     return NextResponse.json(
       { error: verification.error || "Invalid initData" },
@@ -85,17 +92,17 @@ export async function POST(req: Request) {
     );
   }
 
-  const telegramUserId = verification.user?.id;
-  if (!telegramUserId) {
+  const messengerUserId = verification.user?.id;
+  if (!messengerUserId) {
     return NextResponse.json(
-      { error: "Could not identify Telegram user" },
+      { error: "Could not identify user" },
       { status: 401 }
     );
   }
 
   // Rate limit booking attempts per user + business
   pruneRateLimitBuckets();
-  const limit = rateLimit(`bookings:${user_id}:${telegramUserId}`, {
+  const limit = rateLimit(`bookings:${user_id}:${messengerUserId}`, {
     windowMs: 60_000,
     max: 10,
   });

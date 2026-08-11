@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import { useTelegram } from "@/lib/telegram";
+import { useMessenger } from "@/lib/messenger";
 import { ArrowLeft, Check } from "lucide-react";
 import { Service, TimeSlot } from "@/types";
 import { format } from "date-fns";
@@ -18,7 +18,7 @@ interface BookingFlowProps {
 type Step = "services" | "datetime" | "confirm" | "success";
 
 export function BookingFlow({ businessId }: BookingFlowProps) {
-  const { webApp, initData } = useTelegram();
+  const { webApp, initData, platform } = useMessenger();
   const [step, setStep] = useState<Step>("services");
   const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -68,6 +68,7 @@ export function BookingFlow({ businessId }: BookingFlowProps) {
         customer_name: customerName,
         customer_phone: customerPhone || null,
         initData,
+        platform,
       }),
     });
 

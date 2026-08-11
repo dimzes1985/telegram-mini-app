@@ -4,11 +4,11 @@ import { useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChatInterface } from "@/components/telegram/chat-interface";
 import { BookingFlow } from "@/components/telegram/booking-flow";
-import { useTelegram } from "@/lib/telegram";
+import { useMessenger } from "@/lib/messenger";
 import { MessageSquare, Calendar } from "lucide-react";
 
 export default function TelegramMiniApp() {
-  const { user, webApp, colorScheme } = useTelegram();
+  const { user, webApp, colorScheme } = useMessenger();
 
   // Derive business id during render:
   // start_param from Telegram takes priority, then the URL query param.
@@ -35,7 +35,7 @@ export default function TelegramMiniApp() {
       >
         <h1 className="text-lg font-bold mb-2">Business not found</h1>
         <p className="text-sm opacity-70">
-          Open this app from your business Telegram bot to get started.
+          Open this app from your business messenger bot to get started.
         </p>
       </div>
     );

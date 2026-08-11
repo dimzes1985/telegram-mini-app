@@ -2,6 +2,7 @@ import { openai } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyInitData } from "@/lib/telegram-auth";
+import { verifyMaxInitData } from "@/lib/max-auth";
 import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 import { getAiUsage, incrementAiUsage } from "@/lib/ai-usage";
 
@@ -16,23 +17,23 @@ function jsonError(message: string, status: number): Response {
 }
 
 export async function POST(req: Request) {
-  const { messages, businessId, initData } = await req.json();
+  const { messages, businessId, initData, platform = "telegram" } = await req.json();
 
   if (!businessId) {
     return jsonError("businessId required", 400);
   }
 
   if (!initData) {
-    return jsonError("Telegram initData required", 401);
+    return jsonError("initData required", 401);
   }
 
   const supabase = createAdminClient();
 
-  // Fetch business + bot token for initData verification
+  // Fetch business + bot token(s) for initData verification
   const { data: user } = await supabase
     .from("users")
     .select(
-      "system_prompt, business_name, business_description, business_address, business_phone, business_email, bot_token, bot_webhook_secret"
+      "system_prompt, business_name, business_description, business_address, business_phone, business_email, bot_token, bot_webhook_secret, max_bot_token"
     )
     .eq("id", businessId)
     .single();
@@ -41,25 +42,30 @@ export async function POST(req: Request) {
     return jsonError("Business not found", 404);
   }
 
+  const isMax = platform === "max";
+  const botToken = isMax ? user.max_bot_token : user.bot_token;
+
   // Reject requests from businesses that never connected a bot (no way to verify)
-  if (!user.bot_token) {
-    return jsonError("Business has no bot configured", 403);
+  if (!botToken) {
+    return jsonError(isMax ? "Business has no MAX bot configured" : "Business has no bot configured", 403);
   }
 
-  // Verify the customer is genuinely coming from the Telegram Mini App
-  const verification = verifyInitData(initData, user.bot_token);
+  // Verify the customer is genuinely coming from the messenger Mini App
+  const verification = isMax
+    ? verifyMaxInitData(initData, botToken)
+    : verifyInitData(initData, botToken);
   if (!verification.valid) {
     return jsonError(verification.error || "Invalid initData", 401);
   }
 
-  const telegramUserId = verification.user?.id;
-  if (!telegramUserId) {
-    return jsonError("Could not identify Telegram user", 401);
+  const messengerUserId = verification.user?.id;
+  if (!messengerUserId) {
+    return jsonError("Could not identify user", 401);
   }
 
   // Rate limit per user + business to protect AI costs
   pruneRateLimitBuckets();
-  const limit = rateLimit(`chat:${businessId}:${telegramUserId}`, {
+  const limit = rateLimit(`chat:${businessId}:${messengerUserId}`, {
     windowMs: 60_000,
     max: 20,
   });

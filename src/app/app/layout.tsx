@@ -1,9 +1,9 @@
-import { TelegramProvider } from "@/lib/telegram";
+import { MessengerProvider } from "@/lib/messenger";
 
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <TelegramProvider>{children}</TelegramProvider>;
+  return <MessengerProvider>{children}</MessengerProvider>;
 }

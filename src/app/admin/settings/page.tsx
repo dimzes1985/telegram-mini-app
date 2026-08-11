@@ -49,11 +49,17 @@ export default function SettingsPage() {
   const [botUsername, setBotUsername] = useState("");
   const [botTokenSet, setBotTokenSet] = useState(false);
   const [botWebhookSet, setBotWebhookSet] = useState(false);
+  const [maxBotToken, setMaxBotToken] = useState("");
+  const [maxBotUsername, setMaxBotUsername] = useState("");
+  const [maxBotTokenSet, setMaxBotTokenSet] = useState(false);
+  const [maxBotWebhookSet, setMaxBotWebhookSet] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [settingUpBot, setSettingUpBot] = useState(false);
+  const [settingUpMaxBot, setSettingUpMaxBot] = useState(false);
   const [botError, setBotError] = useState("");
+  const [maxBotError, setMaxBotError] = useState("");
   const [plan, setPlan] = useState("free");
   const [aiUsage, setAiUsage] = useState<{ plan: string; used: number; limit: number; remaining: number } | null>(null);
 
@@ -72,6 +78,9 @@ export default function SettingsPage() {
         }
         setBotTokenSet(data.bot_token_set || false);
         setBotUsername(data.bot_username || "");
+        setMaxBotTokenSet(data.max_bot_token_set || false);
+        setMaxBotUsername(data.max_bot_username || "");
+        setMaxBotWebhookSet(data.max_bot_webhook_set || false);
         setPlan(data.plan || "free");
         setAiUsage(data.ai_usage || null);
         setLoading(false);
@@ -84,6 +93,16 @@ export default function SettingsPage() {
         if (data.configured) {
           setBotUsername(data.username || "");
           setBotWebhookSet(data.webhook_set || false);
+        }
+      });
+
+    // Check MAX bot status
+    fetch("/api/max/setup")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.configured) {
+          setMaxBotUsername(data.username || "");
+          setMaxBotWebhookSet(data.webhook_set || data.subscription_active || false);
         }
       });
   }, []);
@@ -106,6 +125,11 @@ export default function SettingsPage() {
     // Only include bot_token if user entered a new one
     if (botToken && !botToken.startsWith("••••")) {
       updateData.bot_token = botToken;
+    }
+
+    // Only include max_bot_token if user entered a new one
+    if (maxBotToken && !maxBotToken.startsWith("••••")) {
+      updateData.max_bot_token = maxBotToken;
     }
 
     await fetch("/api/settings", {
@@ -137,6 +161,27 @@ export default function SettingsPage() {
     }
 
     setSettingUpBot(false);
+  };
+
+  const handleSetupMaxBot = async () => {
+    setSettingUpMaxBot(true);
+    setMaxBotError("");
+
+    try {
+      const res = await fetch("/api/max/setup", { method: "POST" });
+      const data = await res.json();
+
+      if (data.success) {
+        setMaxBotWebhookSet(true);
+        if (data.username) setMaxBotUsername(data.username);
+      } else {
+        setMaxBotError(data.error || "Failed to setup MAX bot");
+      }
+    } catch {
+      setMaxBotError("Connection error");
+    }
+
+    setSettingUpMaxBot(false);
   };
 
   const updateDay = (day: string, field: keyof WorkingHoursDay, value: string | boolean) => {
@@ -287,6 +332,97 @@ export default function SettingsPage() {
             {botWebhookSet && (
               <div className="p-3 bg-green-50 rounded-lg text-green-700 text-sm">
                 Your bot is ready! Customers can now interact with it on Telegram.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bot className="h-5 w-5" />
+              MAX Messenger Bot
+            </CardTitle>
+            <CardDescription>
+              Connect your MAX bot to let customers book appointments directly from MAX Messenger.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="maxBotToken">Bot Token</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="maxBotToken"
+                  type="password"
+                  value={maxBotToken}
+                  onChange={(e) => setMaxBotToken(e.target.value)}
+                  placeholder={maxBotTokenSet ? "••••••••" : "Enter your MAX bot access token"}
+                />
+                {maxBotTokenSet && (
+                  <Badge variant="secondary" className="whitespace-nowrap">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Set
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 mt-1">
+                Get a token from the{" "}
+                <a
+                  href="https://max.ru/business_bot"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:underline inline-flex items-center gap-1"
+                >
+                  MAX for Business bot <ExternalLink className="h-3 w-3" />
+                </a>{" "}
+                (command &quot;Получить токен&quot;) or in the bot&apos;s Extended settings on{" "}
+                <a
+                  href="https://business.max.ru/self"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:underline"
+                >
+                  business.max.ru
+                </a>
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                After saving, connect the mini-app to your bot: set the app URL to{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">
+                  {`${typeof window !== "undefined" ? window.location.origin : ""}/app`}
+                </code>{" "}
+                on the MAX platform and create a deep link to open it from the bot.
+              </p>
+            </div>
+
+            {maxBotUsername && (
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm">
+                  <span className="font-medium">Bot:</span> @{maxBotUsername}
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">Webhook:</span>{" "}
+                  {maxBotWebhookSet ? (
+                    <span className="text-green-600">Active</span>
+                  ) : (
+                    <span className="text-yellow-600">Not set</span>
+                  )}
+                </p>
+              </div>
+            )}
+
+            {maxBotTokenSet && !maxBotWebhookSet && (
+              <Button onClick={handleSetupMaxBot} disabled={settingUpMaxBot}>
+                {settingUpMaxBot ? "Setting up..." : "Setup Webhook"}
+              </Button>
+            )}
+
+            {maxBotError && (
+              <p className="text-sm text-red-500">{maxBotError}</p>
+            )}
+
+            {maxBotWebhookSet && (
+              <div className="p-3 bg-green-50 rounded-lg text-green-700 text-sm">
+                Your MAX bot is ready! Customers can now interact with it on MAX Messenger.
               </div>
             )}
           </CardContent>

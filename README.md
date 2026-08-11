@@ -1,8 +1,8 @@
 # Telegram Mini App — Бронирование услуг
 
-Telegram Mini App для бизнеса (например, библиотеки, салона, студии), позволяющее клиентам:
+Mini App для бизнеса (например, библиотеки, салона, студии), позволяющее клиентам:
 
-- просматривать услуги и рабочие часы в Telegram;
+- просматривать услуги и рабочие часы в Telegram и MAX Messenger;
 - бронировать слоты в режиме реального времени;
 - общаться с бизнесом через AI-ассистента на базе OpenAI (GPT-4o-mini).
 
@@ -15,6 +15,7 @@ Telegram Mini App для бизнеса (например, библиотеки,
 - **OpenAI API** (`gpt-4o-mini`) — AI-ассистент в чате
 - **ЮKassa** — приём подписок (Free / Pro / Business)
 - **Telegram Bot API** — вебхук с `secret_token` на каждый бизнес
+- **MAX Bot API** — вебхук с `X-Max-Bot-Api-Secret` на каждый бизнес
 
 ## Тарифы
 
@@ -64,7 +65,27 @@ https://your-domain.com/api/bot/webhook/{businessId}
 
 с уникальным `secret_token` для каждого бизнеса.
 
-### 4. ЮKassa
+### 4. MAX-бот
+
+1. Создайте бота на платформе MAX:
+   - верифицируйте профиль организации/ИП/самозанятого на [business.max.ru](https://business.max.ru);
+   - создайте чат-бота и получите токен доступа (раздел **Чат-боты → Расширенные настройки → Настроить**, либо команда **«Получить токен»** в боте [«MAX для бизнеса»](https://max.ru/business_bot));
+2. Укажите токен в настройках бизнеса в админке (поле MAX Messenger Bot).
+3. Вызовите "Настроить бота" — приложение зарегистрирует вебхук-подписку:
+
+```
+https://your-domain.com/api/max/webhook/{businessId}
+```
+
+с уникальным `secret` (заголовок `X-Max-Bot-Api-Secret`) для каждого бизнеса.
+
+4. Привяжите мини-приложение к боту на платформе MAX — укажите URL приложения
+   `https://your-domain.com/app`. Кнопка «Записаться» в чате открывает мини-приложение
+   с `start_param`, равным `businessId`.
+
+> Примечание: для работы MAX-бота требуется HTTPS. MAX прекращает поддержку вебхуков по HTTP с 25 мая 2026.
+
+### 5. ЮKassa
 
 1. Зарегистрируйте магазин в ЮKassa и получите `shop_id` и секретный ключ.
 2. Укажите в `.env` переменные `YOOKASSA_SHOP_ID` и `YOOKASSA_SECRET_KEY`.
@@ -76,7 +97,7 @@ https://your-domain.com/api/billing/webhook
 
 4. Для рекуррентных списаний (автопродление Pro/Business) включите **saved_income** (рекуррентные платежи) в настройках магазина.
 
-### 5. Cron продления подписок
+### 6. Cron продления подписок
 
 Для автопродления подписок раз в день вызывайте:
 
@@ -113,6 +134,8 @@ npm start
 | `/api/bot/webhook/[businessId]` | Вебхук Telegram-бота | `secret_token` |
 | `/api/bot/setup` | Регистрация вебхука бота | Auth |
 | `/api/bot/commands` | Команды бота | Auth |
+| `/api/max/webhook/[businessId]` | Вебхук MAX-бота | `X-Max-Bot-Api-Secret` |
+| `/api/max/setup` | Подписка на обновления MAX-бота | Auth |
 | `/api/public/services` | Публичные услуги | — |
 | `/api/timeslots` | Доступные слоты | Service role |
 | `/api/bookings` | Создание/список броней | initData + rate limit |
@@ -128,6 +151,11 @@ npm start
 ## Безопасность
 
 - **RLS**: клиентские политики ограничены собственными строками; чувствительные данные читаются серверными роутами через service role.
-- **initData**: верификация Telegram initData (HMAC-SHA256) для публичных мутаций.
+- **initData**: верификация Telegram/MAX initData (HMAC-SHA256) для публичных мутаций.
 - **Rate limiting**: in-memory лимитер (20 запросов/мин для чата, 10/мин для бронирования).
 - **AI-квота**: месячный лимит сообщений зависит от тарифа, учитывается через `ai_usage`.
+
+## Миграции
+
+- `migration.sql` — расширение базовой схемы (вебхуки ботов, тарифы, AI-квота).
+- `migration-max.sql` — поддержка MAX-бота (`max_bot_token`, `max_bot_username`, `max_bot_webhook_secret`, `max_bot_webhook_set`).

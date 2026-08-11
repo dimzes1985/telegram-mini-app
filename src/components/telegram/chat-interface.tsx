@@ -5,7 +5,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTelegram } from "@/lib/telegram";
+import { useMessenger } from "@/lib/messenger";
 import { Send } from "lucide-react";
 
 interface ChatInterfaceProps {
@@ -14,10 +14,10 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({ businessId }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
-  const { webApp, initData } = useTelegram();
+  const { webApp, initData, platform } = useMessenger();
   const transport = new DefaultChatTransport({
     api: "/api/chat",
-    body: () => ({ businessId, initData }),
+    body: () => ({ businessId, initData, platform }),
   });
 
   const { messages, sendMessage, status } = useChat({
