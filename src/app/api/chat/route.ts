@@ -1,10 +1,10 @@
-import { openai } from "@ai-sdk/openai";
 import { streamText } from "ai";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyInitData } from "@/lib/telegram-auth";
 import { verifyMaxInitData } from "@/lib/max-auth";
 import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 import { getAiUsage, incrementAiUsage } from "@/lib/ai-usage";
+import { getAiModel } from "@/lib/ai";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,7 +120,7 @@ When a customer wants to book, ask for:
 Be friendly, professional, and helpful.`;
 
   const result = streamText({
-    model: openai("gpt-4o-mini"),
+    model: getAiModel(),
     system: systemPrompt,
     messages,
     onFinish: async () => {
