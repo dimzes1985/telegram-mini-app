@@ -134,6 +134,22 @@ Be friendly, professional, and helpful.`;
     return new Response(text, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
   } catch (e) {
     console.error("chat error:", e);
-    return jsonError(`AI error: ${(e as Error).message}`, 500);
+    const err = e as Error & {
+      statusCode?: number;
+      cause?: Error;
+      requestBodyValues?: unknown;
+      url?: string;
+    };
+    return jsonError(
+      JSON.stringify({
+        error: err.message,
+        name: err.name,
+        statusCode: err.statusCode,
+        cause: err.cause ? { name: err.cause.name, message: err.cause.message } : null,
+        url: err.url || null,
+        requestBodyValues: err.requestBodyValues || null,
+      }),
+      500
+    );
   }
 }
