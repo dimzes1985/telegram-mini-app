@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   sendTelegramMessage,
+  sendTelegramMessageChunked,
   sendWebAppButton,
   sendServiceButtons,
   answerCallbackQuery,
   type TelegramUpdate,
 } from "@/lib/telegram-bot";
 import { buildBusinessInfoText } from "@/lib/business-info";
+import { generateAiReply } from "@/lib/ai-assistant";
+import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 
 // POST - Telegram webhook handler (per-business endpoint)
 export async function POST(
@@ -165,24 +168,55 @@ export async function POST(
     return NextResponse.json({ ok: true });
   }
 
-  // Handle regular messages - use AI chat
-  await sendTelegramMessage(
-    botToken,
-    chatId!,
-    `Спасибо за ваше сообщение! Для более подробной помощи, пожалуйста, используйте наше приложение:`,
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: "💬 Задать вопрос ИИ-ассистенту",
-              web_app: { url: appUrl },
-            },
-          ],
-        ],
-      },
+  // Handle regular messages - answer with the AI assistant
+  pruneRateLimitBuckets();
+  const limit = rateLimit(`tg:ai:${user.id}:${chatId}`, {
+    windowMs: 60_000,
+    max: 10,
+  });
+  if (!limit.allowed) {
+    await sendTelegramMessage(
+      botToken,
+      chatId,
+      "Пожалуйста, подождите немного перед следующим вопросом 🙂"
+    );
+    return NextResponse.json({ ok: true });
+  }
+
+  const reply = await generateAiReply(user.id, [
+    { role: "user", content: text },
+  ]);
+
+  if (!reply.ok) {
+    if (reply.reason === "quota") {
+      await sendTelegramMessage(
+        botToken,
+        chatId,
+        "Извините, месячный лимит сообщений исчерпан. Пожалуйста, обратитесь к владельцу бизнеса."
+      );
+    } else {
+      await sendTelegramMessage(
+        botToken,
+        chatId,
+        "Извините, что-то пошло не так. Попробуйте ещё раз чуть позже или откройте наше приложение:",
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "💬 Задать вопрос в приложении",
+                  web_app: { url: appUrl },
+                },
+              ],
+            ],
+          },
+        }
+      );
     }
-  );
+    return NextResponse.json({ ok: true });
+  }
+
+  await sendTelegramMessageChunked(botToken, chatId, reply.text);
 
   return NextResponse.json({ ok: true });
 }

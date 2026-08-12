@@ -5,6 +5,7 @@ import { verifyMaxInitData } from "@/lib/max-auth";
 import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 import { getAiUsage, incrementAiUsage } from "@/lib/ai-usage";
 import { getAiModel } from "@/lib/ai";
+import { buildSystemPrompt } from "@/lib/ai-assistant";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,35 +90,7 @@ export async function POST(req: Request) {
     .eq("user_id", businessId)
     .eq("active", true);
 
-  const servicesContext = services
-    ?.map(
-      (s) =>
-        `- ${s.title}: $${s.price} (${s.duration_minutes} min)${s.description ? ` - ${s.description}` : ""}`
-    )
-    .join("\n") || "No services available.";
-
-  const systemPrompt = `${user?.system_prompt || "You are a helpful assistant."}
-
-Business: ${user?.business_name || "Our Business"}
-${user?.business_description ? `Description: ${user.business_description}` : ""}
-${user?.business_address ? `Address: ${user.business_address}` : ""}
-${user?.business_phone ? `Phone: ${user.business_phone}` : ""}
-${user?.business_email ? `Email: ${user.business_email}` : ""}
-
-Available Services:
-${servicesContext}
-
-You can help customers:
-1. Learn about our services and pricing
-2. Answer questions about availability
-3. Guide them through the booking process
-
-When a customer wants to book, ask for:
-- Which service they want
-- Their preferred date and time
-- Their name and phone number
-
-Be friendly, professional, and helpful.`;
+  const systemPrompt = buildSystemPrompt(user, services ?? []);
 
   const result = streamText({
     model: getAiModel(),
