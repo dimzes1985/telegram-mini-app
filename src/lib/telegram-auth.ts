@@ -1,4 +1,4 @@
-import { createHmac, createHash } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 
 export interface VerifiedTelegramUser {
   id: number;
@@ -39,7 +39,7 @@ function safeCompare(a: string, b: string): boolean {
   const aBuf = Buffer.from(a);
   const bBuf = Buffer.from(b);
   if (aBuf.length !== bBuf.length) return false;
-  return createHash("sha256").update(aBuf).digest() === createHash("sha256").update(bBuf).digest();
+  return timingSafeEqual(aBuf, bBuf);
 }
 
 export interface VerifyResult {
