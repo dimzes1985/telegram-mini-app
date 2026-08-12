@@ -119,63 +119,15 @@ When a customer wants to book, ask for:
 
 Be friendly, professional, and helpful.`;
 
-  let probeInfo = "probe-not-run";
+  const result = streamText({
+    model: openai("gpt-4o-mini"),
+    system: systemPrompt,
+    messages,
+    onFinish: async () => {
+      // Count the assistant response toward the monthly quota
+      await incrementAiUsage(supabase, businessId);
+    },
+  });
 
-  try {
-    try {
-      const probe = await fetch(
-        `${process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"}/responses`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY || "(empty)"}`,
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            input: "Привет",
-            stream: false,
-          }),
-        }
-      );
-      probeInfo = `status=${probe.status} base=${process.env.OPENAI_BASE_URL || "default"} body=${(await probe.text()).slice(0, 500)}`;
-    } catch (probeErr) {
-      probeInfo = `probe threw: ${(probeErr as Error).message}`;
-    }
-
-    const result = streamText({
-      model: openai("gpt-4o-mini"),
-      system: systemPrompt,
-      messages,
-      onFinish: async () => {
-        // Count the assistant response toward the monthly quota
-        await incrementAiUsage(supabase, businessId);
-      },
-    });
-
-    const text = await result.text;
-    return new Response(`PROBE ${probeInfo}\n\n${text}`, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
-  } catch (e) {
-    console.error("chat error:", e);
-    const err = e as Error & {
-      statusCode?: number;
-      cause?: Error;
-      requestBodyValues?: unknown;
-      url?: string;
-    };
-    return jsonError(
-      JSON.stringify({
-        error: err.message,
-        name: err.name,
-        statusCode: err.statusCode,
-        cause: err.cause ? { name: err.cause.name, message: err.cause.message } : null,
-        url: err.url || null,
-        requestBodyValues: err.requestBodyValues || null,
-        probeInfo,
-      }),
-      500
-    );
-  }
+  return result.toTextStreamResponse();
 }
