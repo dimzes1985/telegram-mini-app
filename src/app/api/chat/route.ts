@@ -120,22 +120,27 @@ When a customer wants to book, ask for:
 Be friendly, professional, and helpful.`;
 
   try {
-    const probe = await fetch(
-      `${process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"}/responses`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY || "(empty)"}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          input: "Привет",
-          stream: false,
-        }),
-      }
-    );
-    const probeBody = await probe.text();
+    let probeInfo = "probe-not-run";
+    try {
+      const probe = await fetch(
+        `${process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"}/responses`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY || "(empty)"}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            input: "Привет",
+            stream: false,
+          }),
+        }
+      );
+      probeInfo = `status=${probe.status} base=${process.env.OPENAI_BASE_URL || "default"} body=${(await probe.text()).slice(0, 500)}`;
+    } catch (probeErr) {
+      probeInfo = `probe threw: ${(probeErr as Error).message}`;
+    }
 
     const result = streamText({
       model: openai("gpt-4o-mini"),
@@ -148,10 +153,9 @@ Be friendly, professional, and helpful.`;
     });
 
     const text = await result.text;
-    return new Response(
-      `PROBE status=${probe.status} body=${probeBody.slice(0, 400)}\n\n${text}`,
-      { headers: { "Content-Type": "text/plain; charset=utf-8" } }
-    );
+    return new Response(`PROBE ${probeInfo}\n\n${text}`, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
   } catch (e) {
     console.error("chat error:", e);
     const err = e as Error & {
@@ -168,6 +172,7 @@ Be friendly, professional, and helpful.`;
         cause: err.cause ? { name: err.cause.name, message: err.cause.message } : null,
         url: err.url || null,
         requestBodyValues: err.requestBodyValues || null,
+        probeInfo,
       }),
       500
     );
