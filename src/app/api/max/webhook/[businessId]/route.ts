@@ -45,8 +45,13 @@ export async function POST(
     return NextResponse.json({ ok: false }, { status: 404 });
   }
 
+  // Reject requests if the MAX bot was never fully configured via the admin panel
+  if (!user.max_bot_webhook_secret) {
+    return NextResponse.json({ ok: false }, { status: 403 });
+  }
+
   // Reject requests that don't carry the matching secret
-  if (user.max_bot_webhook_secret && secret !== user.max_bot_webhook_secret) {
+  if (secret !== user.max_bot_webhook_secret) {
     return NextResponse.json({ ok: false }, { status: 403 });
   }
 

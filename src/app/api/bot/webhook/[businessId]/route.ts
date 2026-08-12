@@ -36,8 +36,13 @@ export async function POST(
     return NextResponse.json({ ok: false }, { status: 404 });
   }
 
+  // Reject requests if the bot was never fully configured via the admin panel
+  if (!user.bot_webhook_secret) {
+    return NextResponse.json({ ok: false }, { status: 403 });
+  }
+
   // Reject requests that don't carry the matching secret
-  if (user.bot_webhook_secret && secretToken !== user.bot_webhook_secret) {
+  if (secretToken !== user.bot_webhook_secret) {
     return NextResponse.json({ ok: false }, { status: 403 });
   }
 
