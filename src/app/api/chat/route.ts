@@ -119,8 +119,9 @@ When a customer wants to book, ask for:
 
 Be friendly, professional, and helpful.`;
 
+  let probeInfo = "probe-not-run";
+
   try {
-    let probeInfo = "probe-not-run";
     try {
       const probe = await fetch(
         `${process.env.OPENAI_BASE_URL || "https://api.openai.com/v1"}/responses`,
