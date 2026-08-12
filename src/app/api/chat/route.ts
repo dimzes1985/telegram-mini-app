@@ -119,15 +119,21 @@ When a customer wants to book, ask for:
 
 Be friendly, professional, and helpful.`;
 
-  const result = streamText({
-    model: openai("gpt-4o-mini"),
-    system: systemPrompt,
-    messages,
-    onFinish: async () => {
-      // Count the assistant response toward the monthly quota
-      await incrementAiUsage(supabase, businessId);
-    },
-  });
+  try {
+    const result = streamText({
+      model: openai("gpt-4o-mini"),
+      system: systemPrompt,
+      messages,
+      onFinish: async () => {
+        // Count the assistant response toward the monthly quota
+        await incrementAiUsage(supabase, businessId);
+      },
+    });
 
-  return result.toTextStreamResponse();
+    const text = await result.text;
+    return new Response(text, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+  } catch (e) {
+    console.error("chat error:", e);
+    return jsonError(`AI error: ${(e as Error).message}`, 500);
+  }
 }
