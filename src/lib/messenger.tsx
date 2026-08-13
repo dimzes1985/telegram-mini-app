@@ -137,13 +137,12 @@ function webAppFromHash(): {
     if (!encoded) return null;
     const initData = decodeURIComponent(encoded);
 
-    let initDataUnsafe: MessengerWebApp["initDataUnsafe"] = {};
+    const initDataUnsafe: MessengerWebApp["initDataUnsafe"] = {};
     const parsed = new URLSearchParams(initData);
     const userRaw = parsed.get("user");
     if (userRaw) initDataUnsafe.user = JSON.parse(userRaw);
     const startParam = parsed.get("start_param");
     if (startParam) initDataUnsafe.start_param = startParam;
-
     let themeParams: MessengerWebApp["themeParams"] = {};
     const themeRaw = params.get("tgWebAppThemeParams");
     if (themeRaw) {
