@@ -120,6 +120,57 @@ function adaptMaxWebApp(app: RawWebApp): MessengerWebApp {
   };
 }
 
+// Some Telegram clients (e.g. Desktop) inject the initData into the URL hash
+// (#tgWebAppData=...) but do not expose the window.Telegram.WebApp object to the
+// page. In that case we build the WebApp state directly from the hash.
+function webAppFromHash(): {
+  platform: MessengerPlatform;
+  webApp: MessengerWebApp;
+} | null {
+  if (typeof window === "undefined") return null;
+  const hash = window.location.hash;
+  if (!hash.includes("tgWebAppData=")) return null;
+
+  try {
+    const params = new URLSearchParams(hash.replace(/^#/, ""));
+    const encoded = params.get("tgWebAppData");
+    if (!encoded) return null;
+    const initData = decodeURIComponent(encoded);
+
+    let initDataUnsafe: MessengerWebApp["initDataUnsafe"] = {};
+    const parsed = new URLSearchParams(initData);
+    const userRaw = parsed.get("user");
+    if (userRaw) initDataUnsafe.user = JSON.parse(userRaw);
+    const startParam = parsed.get("start_param");
+    if (startParam) initDataUnsafe.start_param = startParam;
+
+    let themeParams: MessengerWebApp["themeParams"] = {};
+    const themeRaw = params.get("tgWebAppThemeParams");
+    if (themeRaw) {
+      try {
+        themeParams = JSON.parse(decodeURIComponent(themeRaw));
+      } catch {
+        // ignore theme parsing errors
+      }
+    }
+
+    return {
+      platform: "telegram",
+      webApp: {
+        ready: () => {},
+        expand: () => {},
+        initData,
+        initDataUnsafe,
+        themeParams,
+        colorScheme: "light",
+        HapticFeedback: noopHaptic,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 function loadMaxBridge(): Promise<RawWebApp | null> {
   return new Promise((resolve) => {
     const w = window as unknown as { WebApp?: RawWebApp };
@@ -170,6 +221,12 @@ async function detectWebApp(): Promise<{
   // Telegram native injection
   if (win.Telegram?.WebApp) {
     return { platform: "telegram", webApp: adaptTelegramWebApp(win.Telegram.WebApp) };
+  }
+
+  // Some Telegram clients inject initData into the URL hash only
+  const fromHash = webAppFromHash();
+  if (fromHash) {
+    return fromHash;
   }
 
   // MAX Bridge (script may already be loaded by the host)
