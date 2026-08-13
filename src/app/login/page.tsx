@@ -42,7 +42,7 @@ export default function LoginPage() {
       }
     } catch (err) {
       console.error("Sign in error:", err);
-      setError(`Connection error: ${err instanceof Error ? err.message : "Unknown error"}`);
+      setError(`Ошибка соединения: ${err instanceof Error ? err.message : "Неизвестная ошибка"}`);
     } finally {
       setLoading(false);
     }
@@ -73,11 +73,11 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
-        setError("Account created! Check your email for confirmation link, or try signing in.");
+        setError("Аккаунт создан! Проверьте почту для подтверждения, либо войдите.");
       }
     } catch (err) {
       console.error("Sign up error:", err);
-      setError(`Connection error: ${err instanceof Error ? err.message : "Unknown error"}`);
+      setError(`Ошибка соединения: ${err instanceof Error ? err.message : "Неизвестная ошибка"}`);
     } finally {
       setLoading(false);
     }
@@ -87,20 +87,20 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">CRM Dashboard</CardTitle>
-          <CardDescription>Sign in to manage your business</CardDescription>
+          <CardTitle className="text-2xl">Панель управления</CardTitle>
+          <CardDescription>Войдите, чтобы управлять своим бизнесом</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              <TabsTrigger value="login">Вход</TabsTrigger>
+              <TabsTrigger value="signup">Регистрация</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4 mt-4">
                 <div>
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Почта</Label>
                   <Input
                     id="email"
                     type="email"
@@ -111,7 +111,7 @@ export default function LoginPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">Пароль</Label>
                   <Input
                     id="password"
                     type="password"
@@ -125,7 +125,7 @@ export default function LoginPage() {
                   <p className="text-sm text-red-500">{error}</p>
                 )}
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Signing in..." : "Sign In"}
+                  {loading ? "Вход..." : "Войти"}
                 </Button>
               </form>
             </TabsContent>
@@ -133,17 +133,17 @@ export default function LoginPage() {
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4 mt-4">
                 <div>
-                  <Label htmlFor="businessName">Business Name</Label>
+                  <Label htmlFor="businessName">Название бизнеса</Label>
                   <Input
                     id="businessName"
                     value={businessName}
                     onChange={(e) => setBusinessName(e.target.value)}
-                    placeholder="Your Business Name"
+                    placeholder="Название вашего бизнеса"
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="emailSignup">Email</Label>
+                  <Label htmlFor="emailSignup">Почта</Label>
                   <Input
                     id="emailSignup"
                     type="email"
@@ -154,7 +154,7 @@ export default function LoginPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="passwordSignup">Password</Label>
+                  <Label htmlFor="passwordSignup">Пароль</Label>
                   <Input
                     id="passwordSignup"
                     type="password"
@@ -168,7 +168,7 @@ export default function LoginPage() {
                   <p className="text-sm text-red-500">{error}</p>
                 )}
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Creating account..." : "Create Account"}
+                  {loading ? "Создание аккаунта..." : "Создать аккаунт"}
                 </Button>
               </form>
             </TabsContent>

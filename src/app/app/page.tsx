@@ -33,9 +33,9 @@ export default function TelegramMiniApp() {
           color: webApp.themeParams?.text_color || (colorScheme === "dark" ? "#ffffff" : "#000000"),
         }}
       >
-        <h1 className="text-lg font-bold mb-2">Business not found</h1>
+        <h1 className="text-lg font-bold mb-2">Бизнес не найден</h1>
         <p className="text-sm opacity-70">
-          Open this app from your business messenger bot to get started.
+          Откройте это приложение из бота вашего бизнеса в мессенджере.
         </p>
       </div>
     );
@@ -58,7 +58,7 @@ export default function TelegramMiniApp() {
         }}
       >
         <h1 className="text-lg font-bold text-center">
-          {user ? `Hi, ${user.first_name}!` : "Book Appointment"}
+          {user ? `Привет, ${user.first_name}!` : "Запись"}
         </h1>
       </header>
 
@@ -88,7 +88,7 @@ export default function TelegramMiniApp() {
               onClick={() => webApp.HapticFeedback.impactOccurred("light")}
             >
               <MessageSquare className="h-5 w-5" />
-              <span className="text-xs">Chat</span>
+              <span className="text-xs">Чат</span>
             </TabsTrigger>
             <TabsTrigger
               value="book"
@@ -96,7 +96,7 @@ export default function TelegramMiniApp() {
               onClick={() => webApp.HapticFeedback.impactOccurred("light")}
             >
               <Calendar className="h-5 w-5" />
-              <span className="text-xs">Book</span>
+              <span className="text-xs">Запись</span>
             </TabsTrigger>
           </TabsList>
         </div>

@@ -59,38 +59,38 @@ export function ServiceForm({ service, onSave, onDelete, trigger }: ServiceFormP
         {trigger || (
           <Button>
             <Plus className="h-4 w-4 mr-2" />
-            Add Service
+            Добавить услугу
           </Button>
         )}
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{service ? "Edit Service" : "Add Service"}</DialogTitle>
+            <DialogTitle>{service ? "Редактировать услугу" : "Добавить услугу"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="title">Название</Label>
               <Input
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Haircut"
+                placeholder="Например: Стрижка"
                 required
               />
             </div>
             <div>
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">Описание</Label>
               <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Brief description of the service"
+                placeholder="Краткое описание услуги"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="price">Price ($)</Label>
+                <Label htmlFor="price">Цена (₽)</Label>
                 <Input
                   id="price"
                   type="number"
@@ -103,7 +103,7 @@ export function ServiceForm({ service, onSave, onDelete, trigger }: ServiceFormP
                 />
               </div>
               <div>
-                <Label htmlFor="duration">Duration (min)</Label>
+                <Label htmlFor="duration">Длительность (мин)</Label>
                 <Input
                   id="duration"
                   type="number"
@@ -126,11 +126,11 @@ export function ServiceForm({ service, onSave, onDelete, trigger }: ServiceFormP
                   }}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+                  Удалить
                 </Button>
               )}
               <Button type="submit" disabled={loading} className={service ? "" : "w-full"}>
-                {loading ? "Saving..." : "Save"}
+                {loading ? "Сохранение..." : "Сохранить"}
               </Button>
             </div>
           </form>

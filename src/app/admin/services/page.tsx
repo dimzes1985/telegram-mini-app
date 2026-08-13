@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Pencil } from "lucide-react";
 import { ServiceForm } from "@/components/admin/service-form";
+import { formatPrice } from "@/lib/labels";
 import { Service } from "@/types";
 
 export default function ServicesPage() {
@@ -58,16 +59,16 @@ export default function ServicesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">Services</h1>
+        <h1 className="text-3xl font-bold">Услуги</h1>
         <ServiceForm onSave={handleCreate} />
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="text-center py-12 text-gray-500">Загрузка...</div>
       ) : services.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-gray-500">
-            No services yet. Add your first service to get started!
+            Услуг пока нет. Добавьте первую услугу, чтобы начать!
           </CardContent>
         </Card>
       ) : (
@@ -84,13 +85,13 @@ export default function ServicesPage() {
                       </p>
                     )}
                     <div className="flex gap-4 mt-2 text-sm text-gray-500">
-                      <span>${service.price}</span>
-                      <span>{service.duration_minutes} min</span>
+                      <span>{formatPrice(service.price)}</span>
+                      <span>{service.duration_minutes} мин</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={service.active ? "default" : "secondary"}>
-                      {service.active ? "Active" : "Inactive"}
+                      {service.active ? "Активна" : "Неактивна"}
                     </Badge>
                     <ServiceForm
                       service={service}

@@ -5,7 +5,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle } from "lucide-react";
+import { bookingStatusLabel } from "@/lib/labels";
 import { Booking } from "@/types";
+
+const FILTERS = [
+  { key: "all", label: "Все" },
+  { key: "pending", label: "Ожидают" },
+  { key: "confirmed", label: "Подтверждены" },
+  { key: "cancelled", label: "Отменены" },
+];
 
 export function BookingsListView() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -48,23 +56,23 @@ export function BookingsListView() {
     <div>
       {/* Filter Tabs */}
       <div className="flex gap-2 mb-6">
-        {["all", "pending", "confirmed", "cancelled"].map((status) => (
+        {FILTERS.map(({ key, label }) => (
           <Button
-            key={status}
-            variant={filter === status ? "default" : "outline"}
-            onClick={() => setFilter(status)}
+            key={key}
+            variant={filter === key ? "default" : "outline"}
+            onClick={() => setFilter(key)}
           >
-            {status.charAt(0).toUpperCase() + status.slice(1)}
+            {label}
           </Button>
         ))}
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="text-center py-12 text-gray-500">Загрузка...</div>
       ) : filteredBookings.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-gray-500">
-            No bookings found.
+            Бронирования не найдены.
           </CardContent>
         </Card>
       ) : (
@@ -79,11 +87,11 @@ export function BookingsListView() {
                       {booking.service?.title}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {booking.booking_date} at {booking.booking_time}
+                      {booking.booking_date} в {booking.booking_time}
                     </p>
                     {booking.customer_phone && (
                       <p className="text-sm text-gray-500">
-                        Phone: {booking.customer_phone}
+                        Телефон: {booking.customer_phone}
                       </p>
                     )}
                   </div>
@@ -97,7 +105,7 @@ export function BookingsListView() {
                             : "secondary"
                       }
                     >
-                      {booking.status}
+                      {bookingStatusLabel(booking.status)}
                     </Badge>
                     {booking.status === "pending" && (
                       <div className="flex gap-2">
@@ -108,7 +116,7 @@ export function BookingsListView() {
                           }
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
-                          Confirm
+                          Подтвердить
                         </Button>
                         <Button
                           size="sm"
@@ -118,7 +126,7 @@ export function BookingsListView() {
                           }
                         >
                           <XCircle className="h-4 w-4 mr-1" />
-                          Cancel
+                          Отменить
                         </Button>
                       </div>
                     )}

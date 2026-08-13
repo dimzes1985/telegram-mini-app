@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, CheckCircle } from "lucide-react";
+import { bookingStatusLabel } from "@/lib/labels";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
@@ -41,14 +42,14 @@ export default async function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-8">Дашборд</h1>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Total Bookings
+              Всего бронирований
             </CardTitle>
             <Calendar className="h-5 w-5 text-gray-400" />
           </CardHeader>
@@ -60,7 +61,7 @@ export default async function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Pending
+              Ожидают
             </CardTitle>
             <Clock className="h-5 w-5 text-yellow-500" />
           </CardHeader>
@@ -74,7 +75,7 @@ export default async function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Confirmed
+              Подтверждено
             </CardTitle>
             <CheckCircle className="h-5 w-5 text-green-500" />
           </CardHeader>
@@ -88,7 +89,7 @@ export default async function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Today&apos;s Bookings
+              На сегодня
             </CardTitle>
             <Calendar className="h-5 w-5 text-blue-500" />
           </CardHeader>
@@ -103,7 +104,7 @@ export default async function AdminDashboard() {
       {/* Recent Bookings */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Bookings</CardTitle>
+          <CardTitle>Последние бронирования</CardTitle>
         </CardHeader>
         <CardContent>
           {recentBookings && recentBookings.length > 0 ? (
@@ -117,7 +118,7 @@ export default async function AdminDashboard() {
                     <p className="font-medium">{booking.customer_name}</p>
                     <p className="text-sm text-gray-600">
                       {booking.service?.title} • {booking.booking_date}{" "}
-                      at {booking.booking_time}
+                      в {booking.booking_time}
                     </p>
                   </div>
                   <Badge
@@ -129,14 +130,14 @@ export default async function AdminDashboard() {
                           : "secondary"
                     }
                   >
-                    {booking.status}
+                    {bookingStatusLabel(booking.status)}
                   </Badge>
                 </div>
               ))}
             </div>
           ) : (
             <p className="text-gray-500 text-center py-8">
-              No bookings yet. Share your Telegram Mini App to get started!
+              Бронирований пока нет. Поделитесь своим Телеграм мини-приложением!
             </p>
           )}
         </CardContent>

@@ -7,27 +7,27 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   {
-    label: "Dashboard",
+    label: "Дашборд",
     href: "/admin",
     icon: LayoutDashboard,
   },
   {
-    label: "Services",
+    label: "Услуги",
     href: "/admin/services",
     icon: Briefcase,
   },
   {
-    label: "Bookings",
+    label: "Бронирования",
     href: "/admin/bookings",
     icon: Calendar,
   },
   {
-    label: "Billing",
+    label: "Оплата",
     href: "/admin/billing",
     icon: CreditCard,
   },
   {
-    label: "Settings",
+    label: "Настройки",
     href: "/admin/settings",
     icon: Settings,
   },
@@ -39,8 +39,8 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-gray-900 text-white min-h-screen p-4">
       <div className="mb-8">
-        <h1 className="text-xl font-bold">CRM Dashboard</h1>
-        <p className="text-sm text-gray-400">Telegram Mini App</p>
+        <h1 className="text-xl font-bold">Панель управления</h1>
+        <p className="text-sm text-gray-400">Телеграм Мини-приложение</p>
       </div>
 
       <nav className="space-y-1">

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check, Loader2 } from "lucide-react";
+import { pluralize } from "@/lib/labels";
 
 interface PlanInfo {
   id: string;
@@ -30,7 +31,7 @@ interface BillingStatus {
 
 const FREE_PLAN: PlanInfo = {
   id: "free",
-  name: "Free",
+  name: "Бесплатно",
   price_monthly_rub: 0,
   ai_messages_per_month: 50,
   max_services: 3,
@@ -39,7 +40,7 @@ const FREE_PLAN: PlanInfo = {
 
 export default function BillingPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div>Загрузка...</div>}>
       <BillingContent />
     </Suspense>
   );
@@ -75,21 +76,21 @@ function BillingContent() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to start checkout");
+        setError(data.error || "Не удалось начать оплату");
         return;
       }
       if (data.confirmation_url) {
         window.location.assign(data.confirmation_url);
       }
     } catch {
-      setError("Connection error");
+      setError("Ошибка соединения");
     } finally {
       setCheckingOut(null);
     }
   };
 
   if (loading) {
-    return <div className="text-center py-12 text-gray-500">Loading...</div>;
+    return <div className="text-center py-12 text-gray-500">Загрузка...</div>;
   }
 
   const plans = status ? [...status.available_plans, FREE_PLAN].sort((a, b) => a.price_monthly_rub - b.price_monthly_rub) : [FREE_PLAN];
@@ -97,38 +98,38 @@ function BillingContent() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-2">Billing</h1>
+      <h1 className="text-3xl font-bold mb-2">Оплата</h1>
       <p className="text-gray-500 mb-8">
-        Manage your subscription and plan limits.
+        Управление подпиской и лимитами тарифа.
       </p>
 
       {status?.subscription && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              Current Subscription
+              Текущая подписка
               <Badge className="capitalize">{status.subscription.status}</Badge>
             </CardTitle>
             <CardDescription>
               {status.subscription.cancel_at_period_end
-                ? "Your subscription is set to cancel at the end of the current period."
-                : "Renews automatically every month."}
+                ? "Подписка будет отменена в конце текущего периода."
+                : "Автоматически продлевается каждый месяц."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">Plan</span>
+              <span className="text-gray-500">Тариф</span>
               <span className="font-medium capitalize">{status.subscription.plan}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Period ends</span>
+              <span className="text-gray-500">Действует до</span>
               <span className="font-medium">
-                {new Date(status.subscription.current_period_end).toLocaleDateString()}
+                {new Date(status.subscription.current_period_end).toLocaleDateString("ru-RU")}
               </span>
             </div>
             {status.usage && (
               <div className="flex justify-between">
-                <span className="text-gray-500">AI messages used</span>
+                <span className="text-gray-500">Использовано AI-сообщений</span>
                 <span className="font-medium">
                   {status.usage.used} / {status.usage.limit}
                 </span>
@@ -144,7 +145,7 @@ function BillingContent() {
                   if (res.ok) setStatus(await res.json());
                 }}
               >
-                Cancel subscription
+                Отменить подписку
               </Button>
             )}
           </CardContent>
@@ -160,9 +161,9 @@ function BillingContent() {
               <CardHeader>
                 <CardTitle className="capitalize">{plan.name}</CardTitle>
                 <div className="text-3xl font-bold">
-                  {plan.price_monthly_rub === 0 ? "Free" : `₽${plan.price_monthly_rub}`}
+                  {plan.price_monthly_rub === 0 ? "Бесплатно" : `${plan.price_monthly_rub.toLocaleString("ru-RU")} ₽`}
                   {plan.price_monthly_rub !== 0 && (
-                    <span className="text-base font-normal text-gray-500">/mo</span>
+                    <span className="text-base font-normal text-gray-500">/мес</span>
                   )}
                 </div>
               </CardHeader>
@@ -171,21 +172,21 @@ function BillingContent() {
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-green-500" />
                     {plan.max_services === null
-                      ? "Unlimited services"
-                      : `${plan.max_services} services`}
+                      ? "Безлимитные услуги"
+                      : `${plan.max_services} ${pluralize(plan.max_services, "услуга", "услуги", "услуг")}`}
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-green-500" />
-                    {plan.ai_messages_per_month.toLocaleString("ru-RU")} AI messages / month
+                    {plan.ai_messages_per_month.toLocaleString("ru-RU")} AI-сообщений в месяц
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-green-500" />
-                    {plan.custom_branding ? "Custom branding" : "Standard branding"}
+                    {plan.custom_branding ? "Свой брендинг" : "Стандартный брендинг"}
                   </li>
                 </ul>
                 {isCurrent ? (
                   <Button variant="outline" disabled className="w-full">
-                    Current Plan
+                    Текущий тариф
                   </Button>
                 ) : isPaid ? (
                   <Button
@@ -196,15 +197,15 @@ function BillingContent() {
                     {checkingOut === plan.id ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Redirecting...
+                        Перенаправление...
                       </>
                     ) : (
-                      "Upgrade"
+                      "Улучшить"
                     )}
                   </Button>
                 ) : (
                   <Button variant="outline" disabled className="w-full">
-                    Downgrade available soon
+                    Понижение тарифа будет доступно позже
                   </Button>
                 )}
               </CardContent>

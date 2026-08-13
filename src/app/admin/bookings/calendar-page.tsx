@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { bookingStatusLabel } from "@/lib/labels";
 import { Booking } from "@/types";
 import {
   format,
@@ -18,6 +19,9 @@ import {
   addMonths,
   subMonths,
 } from "date-fns";
+import { ru } from "date-fns/locale";
+
+const WEEKDAY_HEADERS = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 
 export function CalendarView() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -49,7 +53,7 @@ export function CalendarView() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8">Calendar</h1>
+      <h1 className="text-3xl font-bold mb-8">Календарь</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar Grid */}
@@ -62,7 +66,7 @@ export function CalendarView() {
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
-            <CardTitle>{format(currentDate, "MMMM yyyy")}</CardTitle>
+            <CardTitle>{format(currentDate, "MMMM yyyy", { locale: ru })}</CardTitle>
             <Button
               variant="ghost"
               size="icon"
@@ -74,7 +78,7 @@ export function CalendarView() {
           <CardContent>
             {/* Day headers */}
             <div className="grid grid-cols-7 gap-1 mb-2">
-              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+              {WEEKDAY_HEADERS.map((day) => (
                 <div key={day} className="text-center text-sm font-medium text-gray-500 py-2">
                   {day}
                 </div>
@@ -122,7 +126,7 @@ export function CalendarView() {
                         ))}
                         {dayBookings.length > 2 && (
                           <div className="text-xs text-gray-500">
-                            +{dayBookings.length - 2} more
+                            ещё {dayBookings.length - 2}
                           </div>
                         )}
                       </div>
@@ -138,19 +142,21 @@ export function CalendarView() {
         <Card>
           <CardHeader>
             <CardTitle>
-              {selectedDate ? format(selectedDate, "MMM d, yyyy") : "Select a date"}
+              {selectedDate
+                ? format(selectedDate, "d MMM yyyy", { locale: ru })
+                : "Выберите дату"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-center py-8 text-gray-500">Loading...</div>
+              <div className="text-center py-8 text-gray-500">Загрузка...</div>
             ) : !selectedDate ? (
               <div className="text-center py-8 text-gray-500">
-                Click on a date to view bookings
+                Нажмите на дату, чтобы увидеть бронирования
               </div>
             ) : selectedBookings.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                No bookings for this date
+                Нет бронирований на эту дату
               </div>
             ) : (
               <div className="space-y-3">
@@ -170,7 +176,7 @@ export function CalendarView() {
                               : "secondary"
                         }
                       >
-                        {booking.status}
+                        {bookingStatusLabel(booking.status)}
                       </Badge>
                     </div>
                     <p className="text-sm text-gray-600">
@@ -181,7 +187,7 @@ export function CalendarView() {
                     </p>
                     {booking.customer_phone && (
                       <p className="text-sm text-gray-500">
-                        Phone: {booking.customer_phone}
+                        Телефон: {booking.customer_phone}
                       </p>
                     )}
                   </div>

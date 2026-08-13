@@ -18,13 +18,13 @@ interface WorkingHoursDay {
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 const DAY_LABELS: Record<string, string> = {
-  monday: "Monday",
-  tuesday: "Tuesday",
-  wednesday: "Wednesday",
-  thursday: "Thursday",
-  friday: "Friday",
-  saturday: "Saturday",
-  sunday: "Sunday",
+  monday: "Понедельник",
+  tuesday: "Вторник",
+  wednesday: "Среда",
+  thursday: "Четверг",
+  friday: "Пятница",
+  saturday: "Суббота",
+  sunday: "Воскресенье",
 };
 
 const DEFAULT_WORKING_HOURS: Record<string, WorkingHoursDay> = {
@@ -154,10 +154,10 @@ export default function SettingsPage() {
       if (data.success) {
         setBotWebhookSet(true);
       } else {
-        setBotError(data.error || "Failed to setup bot");
+        setBotError(data.error || "Не удалось настроить бота");
       }
     } catch {
-      setBotError("Connection error");
+      setBotError("Ошибка соединения");
     }
 
     setSettingUpBot(false);
@@ -175,10 +175,10 @@ export default function SettingsPage() {
         setMaxBotWebhookSet(true);
         if (data.username) setMaxBotUsername(data.username);
       } else {
-        setMaxBotError(data.error || "Failed to setup MAX bot");
+        setMaxBotError(data.error || "Не удалось настроить MAX-бота");
       }
     } catch {
-      setMaxBotError("Connection error");
+      setMaxBotError("Ошибка соединения");
     }
 
     setSettingUpMaxBot(false);
@@ -192,53 +192,53 @@ export default function SettingsPage() {
   };
 
   if (loading) {
-    return <div className="text-center py-12 text-gray-500">Loading...</div>;
+    return <div className="text-center py-12 text-gray-500">Загрузка...</div>;
   }
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8">Settings</h1>
+      <h1 className="text-3xl font-bold mb-8">Настройки</h1>
 
       <div className="max-w-2xl space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Business Information</CardTitle>
+            <CardTitle>Информация о бизнесе</CardTitle>
             <CardDescription>
-              This information is displayed to your customers.
+              Эта информация показывается вашим клиентам.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="businessName">Business Name</Label>
+              <Label htmlFor="businessName">Название бизнеса</Label>
               <Input
                 id="businessName"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
-                placeholder="Your Business Name"
+                placeholder="Название вашего бизнеса"
               />
             </div>
             <div>
-              <Label htmlFor="businessDescription">Description</Label>
+              <Label htmlFor="businessDescription">Описание</Label>
               <Textarea
                 id="businessDescription"
                 value={businessDescription}
                 onChange={(e) => setBusinessDescription(e.target.value)}
-                placeholder="Short description shown to customers (e.g. 'Beauty salon in downtown')"
+                placeholder="Краткое описание для клиентов (например: «Салон красоты в центре города»)"
                 rows={3}
               />
             </div>
             <div>
-              <Label htmlFor="businessAddress">Address</Label>
+              <Label htmlFor="businessAddress">Адрес</Label>
               <Input
                 id="businessAddress"
                 value={businessAddress}
                 onChange={(e) => setBusinessAddress(e.target.value)}
-                placeholder="Street, building, city"
+                placeholder="Улица, дом, город"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="businessPhone">Phone</Label>
+                <Label htmlFor="businessPhone">Телефон</Label>
                 <Input
                   id="businessPhone"
                   type="tel"
@@ -248,7 +248,7 @@ export default function SettingsPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="businessEmail">Email</Label>
+                <Label htmlFor="businessEmail">Почта</Label>
                 <Input
                   id="businessEmail"
                   type="email"
@@ -265,32 +265,32 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5" />
-              Telegram Bot
+              Телеграм-бот
             </CardTitle>
             <CardDescription>
-              Connect your Telegram bot to let customers book appointments directly from Telegram.
+              Подключите своего Телеграм-бота, чтобы клиенты могли записываться прямо из Telegram.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="botToken">Bot Token</Label>
+              <Label htmlFor="botToken">Токен бота</Label>
               <div className="flex gap-2">
                 <Input
                   id="botToken"
                   type="password"
                   value={botToken}
                   onChange={(e) => setBotToken(e.target.value)}
-                  placeholder={botTokenSet ? "••••••••" : "Enter bot token from @BotFather"}
+                  placeholder={botTokenSet ? "••••••••" : "Введите токен от @BotFather"}
                 />
                 {botTokenSet && (
                   <Badge variant="secondary" className="whitespace-nowrap">
                     <CheckCircle className="h-3 w-3 mr-1" />
-                    Set
+                    Установлен
                   </Badge>
                 )}
               </div>
               <p className="text-sm text-gray-500 mt-1">
-                Get a token from{" "}
+                Получите токен у{" "}
                 <a
                   href="https://t.me/BotFather"
                   target="_blank"
@@ -299,21 +299,21 @@ export default function SettingsPage() {
                 >
                   @BotFather <ExternalLink className="h-3 w-3" />
                 </a>{" "}
-                on Telegram
+                в Telegram
               </p>
             </div>
 
             {botUsername && (
               <div className="p-3 bg-gray-50 rounded-lg">
                 <p className="text-sm">
-                  <span className="font-medium">Bot:</span> @{botUsername}
+                  <span className="font-medium">Бот:</span> @{botUsername}
                 </p>
                 <p className="text-sm">
-                  <span className="font-medium">Webhook:</span>{" "}
+                  <span className="font-medium">Вебхук:</span>{" "}
                   {botWebhookSet ? (
-                    <span className="text-green-600">Active</span>
+                    <span className="text-green-600">Активен</span>
                   ) : (
-                    <span className="text-yellow-600">Not set</span>
+                    <span className="text-yellow-600">Не настроен</span>
                   )}
                 </p>
               </div>
@@ -321,7 +321,7 @@ export default function SettingsPage() {
 
             {botTokenSet && !botWebhookSet && (
               <Button onClick={handleSetupBot} disabled={settingUpBot}>
-                {settingUpBot ? "Setting up..." : "Setup Webhook"}
+                {settingUpBot ? "Настройка..." : "Настроить вебхук"}
               </Button>
             )}
 
@@ -331,7 +331,7 @@ export default function SettingsPage() {
 
             {botWebhookSet && (
               <div className="p-3 bg-green-50 rounded-lg text-green-700 text-sm">
-                Your bot is ready! Customers can now interact with it on Telegram.
+                Ваш бот готов! Клиенты могут общаться с ним в Telegram.
               </div>
             )}
           </CardContent>
@@ -341,41 +341,41 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5" />
-              MAX Messenger Bot
+              Бот MAX
             </CardTitle>
             <CardDescription>
-              Connect your MAX bot to let customers book appointments directly from MAX Messenger.
+              Подключите своего MAX-бота, чтобы клиенты могли записываться прямо в MAX Messenger.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="maxBotToken">Bot Token</Label>
+              <Label htmlFor="maxBotToken">Токен бота</Label>
               <div className="flex gap-2">
                 <Input
                   id="maxBotToken"
                   type="password"
                   value={maxBotToken}
                   onChange={(e) => setMaxBotToken(e.target.value)}
-                  placeholder={maxBotTokenSet ? "••••••••" : "Enter your MAX bot access token"}
+                  placeholder={maxBotTokenSet ? "••••••••" : "Введите токен доступа MAX-бота"}
                 />
                 {maxBotTokenSet && (
                   <Badge variant="secondary" className="whitespace-nowrap">
                     <CheckCircle className="h-3 w-3 mr-1" />
-                    Set
+                    Установлен
                   </Badge>
                 )}
               </div>
               <p className="text-sm text-gray-500 mt-1">
-                Get a token from the{" "}
+                Получите токен у{" "}
                 <a
                   href="https://max.ru/business_bot"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-500 hover:underline inline-flex items-center gap-1"
                 >
-                  MAX for Business bot <ExternalLink className="h-3 w-3" />
+                  бота «MAX для бизнеса» <ExternalLink className="h-3 w-3" />
                 </a>{" "}
-                (command &quot;Получить токен&quot;) or in the bot&apos;s Extended settings on{" "}
+                (команда «Получить токен») или в расширенных настройках бота на{" "}
                 <a
                   href="https://business.max.ru/self"
                   target="_blank"
@@ -386,25 +386,25 @@ export default function SettingsPage() {
                 </a>
               </p>
               <p className="text-sm text-gray-500 mt-1">
-                After saving, connect the mini-app to your bot: set the app URL to{" "}
+                После сохранения подключите мини-приложение к боту: укажите URL приложения{" "}
                 <code className="text-xs bg-gray-100 px-1 rounded">
                   {`${typeof window !== "undefined" ? window.location.origin : ""}/app`}
                 </code>{" "}
-                on the MAX platform and create a deep link to open it from the bot.
+                на платформе MAX и создайте дип-ссылку для открытия из бота.
               </p>
             </div>
 
             {maxBotUsername && (
               <div className="p-3 bg-gray-50 rounded-lg">
                 <p className="text-sm">
-                  <span className="font-medium">Bot:</span> @{maxBotUsername}
+                  <span className="font-medium">Бот:</span> @{maxBotUsername}
                 </p>
                 <p className="text-sm">
-                  <span className="font-medium">Webhook:</span>{" "}
+                  <span className="font-medium">Вебхук:</span>{" "}
                   {maxBotWebhookSet ? (
-                    <span className="text-green-600">Active</span>
+                    <span className="text-green-600">Активен</span>
                   ) : (
-                    <span className="text-yellow-600">Not set</span>
+                    <span className="text-yellow-600">Не настроен</span>
                   )}
                 </p>
               </div>
@@ -412,7 +412,7 @@ export default function SettingsPage() {
 
             {maxBotTokenSet && !maxBotWebhookSet && (
               <Button onClick={handleSetupMaxBot} disabled={settingUpMaxBot}>
-                {settingUpMaxBot ? "Setting up..." : "Setup Webhook"}
+                {settingUpMaxBot ? "Настройка..." : "Настроить вебхук"}
               </Button>
             )}
 
@@ -422,7 +422,7 @@ export default function SettingsPage() {
 
             {maxBotWebhookSet && (
               <div className="p-3 bg-green-50 rounded-lg text-green-700 text-sm">
-                Your MAX bot is ready! Customers can now interact with it on MAX Messenger.
+                Ваш MAX-бот готов! Клиенты могут общаться с ним в MAX Messenger.
               </div>
             )}
           </CardContent>
@@ -430,9 +430,9 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Working Hours</CardTitle>
+            <CardTitle>Режим работы</CardTitle>
             <CardDescription>
-              Set your business hours. Customers can only book appointments during these times.
+              Укажите часы работы. Клиенты смогут записываться только в это время.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -453,7 +453,7 @@ export default function SettingsPage() {
                       onChange={(e) => updateDay(day, "start", e.target.value)}
                       className="w-32"
                     />
-                    <span className="text-gray-500">to</span>
+                    <span className="text-gray-500">до</span>
                     <Input
                       type="time"
                       value={workingHours[day]?.end || "18:00"}
@@ -469,25 +469,25 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Plan & AI Usage</CardTitle>
+            <CardTitle>Тариф и использование AI</CardTitle>
             <CardDescription>
-              Your current plan and monthly AI message quota.
+              Ваш текущий тариф и месячный лимит AI-сообщений.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium capitalize">{plan} plan</p>
+                <p className="font-medium capitalize">Тариф: {plan}</p>
                 <p className="text-sm text-gray-500">
                   {aiUsage ? (
                     <>
-                      AI messages used this month:{" "}
+                      AI-сообщений использовано в этом месяце:{" "}
                       <span className="font-medium">
                         {aiUsage.used} / {aiUsage.limit}
                       </span>
                     </>
                   ) : (
-                    "AI message usage is unavailable."
+                    "Информация об использовании AI недоступна."
                   )}
                 </p>
               </div>
@@ -497,8 +497,8 @@ export default function SettingsPage() {
             </div>
             {aiUsage && aiUsage.remaining <= 0 && (
               <p className="text-sm text-red-500">
-                You have reached your monthly AI message limit. Upgrade your plan
-                to continue using the AI assistant.
+                Вы исчерпали месячный лимит AI-сообщений. Улучшите тариф, чтобы
+                продолжить использовать AI-ассистента.
               </p>
             )}
           </CardContent>
@@ -506,24 +506,24 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>AI Assistant Configuration</CardTitle>
+            <CardTitle>Настройка AI-ассистента</CardTitle>
             <CardDescription>
-              Customize how your AI assistant communicates with customers.
+              Настройте, как ваш AI-ассистент общается с клиентами.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="systemPrompt">System Prompt</Label>
+              <Label htmlFor="systemPrompt">Системный промпт</Label>
               <Textarea
                 id="systemPrompt"
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
-                placeholder="You are a helpful assistant for..."
+                placeholder="Вы — полезный ассистент для..."
                 rows={10}
               />
               <p className="text-sm text-gray-500 mt-2">
-                Tip: Include your business hours, policies, and any specific
-                information you want the AI to share with customers.
+                Совет: укажите часы работы, правила и любую информацию, которую
+                AI должен сообщать клиентам.
               </p>
             </div>
           </CardContent>
@@ -532,7 +532,7 @@ export default function SettingsPage() {
         <div className="flex justify-end">
           <Button onClick={handleSave} disabled={saving}>
             <Save className="h-4 w-4 mr-2" />
-            {saving ? "Saving..." : saved ? "Saved!" : "Save Settings"}
+            {saving ? "Сохранение..." : saved ? "Сохранено!" : "Сохранить настройки"}
           </Button>
         </div>
       </div>

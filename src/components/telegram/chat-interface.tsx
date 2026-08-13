@@ -45,8 +45,8 @@ export function ChatInterface({ businessId }: ChatInterfaceProps) {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-gray-500 py-8">
-            <p className="text-lg font-medium">Welcome!</p>
-            <p className="text-sm">Ask me anything about our services.</p>
+            <p className="text-lg font-medium">Добро пожаловать!</p>
+            <p className="text-sm">Спросите что-нибудь о наших услугах.</p>
           </div>
         )}
         {messages.map((message) => (
@@ -96,7 +96,7 @@ export function ChatInterface({ businessId }: ChatInterfaceProps) {
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message..."
+            placeholder="Введите сообщение..."
             disabled={isLoading}
             className="flex-1"
           />

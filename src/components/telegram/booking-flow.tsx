@@ -10,6 +10,7 @@ import { useMessenger } from "@/lib/messenger";
 import { ArrowLeft, Check } from "lucide-react";
 import { Service, TimeSlot } from "@/types";
 import { format } from "date-fns";
+import { ru } from "date-fns/locale";
 
 interface BookingFlowProps {
   businessId: string;
@@ -146,7 +147,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
         setStep("success");
       } else {
         webApp.HapticFeedback.notificationOccurred("error");
-        setError(data.error || "Something went wrong. Please try again.");
+        setError(data.error || "Что-то пошло не так. Попробуйте ещё раз.");
       }
       setLoading(false);
     } catch (e) {
@@ -159,11 +160,11 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
   if (step === "services") {
     return (
       <div className="p-4">
-        <h2 className="text-xl font-bold mb-4">Select a Service</h2>
+        <h2 className="text-xl font-bold mb-4">Выберите услугу</h2>
         {services.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
-            <p className="text-lg">No services available</p>
-            <p className="text-sm">Please check back later.</p>
+            <p className="text-lg">Услуги пока не добавлены</p>
+            <p className="text-sm">Загляните позже.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -188,9 +189,9 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
                     )}
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-blue-600">${service.price}</p>
+                    <p className="font-bold text-blue-600">{service.price} ₽</p>
                     <p className="text-sm text-gray-500">
-                      {service.duration_minutes} min
+                      {service.duration_minutes} мин
                     </p>
                   </div>
                 </div>
@@ -212,13 +213,13 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
           className="flex items-center text-gray-600 mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
+          Назад
         </button>
         <h2 className="text-xl font-bold mb-4">
-          Pick a Date & Time
+          Выберите дату и время
         </h2>
         <p className="text-sm text-gray-600 mb-4">
-          {selectedService?.title} - ${selectedService?.price}
+          {selectedService?.title} — {selectedService?.price} ₽
         </p>
 
         <div className="mb-4">
@@ -233,10 +234,10 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
 
         {selectedDate && (
           <div>
-            <h3 className="font-medium mb-2">Available Times</h3>
+            <h3 className="font-medium mb-2">Доступное время</h3>
             {timeSlots.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-4">
-                No available time slots for this date.
+                Нет доступного времени на эту дату.
               </p>
             ) : (
               <div className="grid grid-cols-4 gap-2">
@@ -277,31 +278,31 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
           className="flex items-center text-gray-600 mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
+          Назад
         </button>
-        <h2 className="text-xl font-bold mb-4">Confirm Booking</h2>
+        <h2 className="text-xl font-bold mb-4">Подтвердить запись</h2>
 
         <Card className="mb-4">
           <CardContent className="p-4">
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-gray-600">Service</span>
+                <span className="text-gray-600">Услуга</span>
                 <span className="font-medium">{selectedService?.title}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Date</span>
+                <span className="text-gray-600">Дата</span>
                 <span className="font-medium">
-                  {selectedDate && format(selectedDate, "MMM d, yyyy")}
+                  {selectedDate && format(selectedDate, "d MMM yyyy", { locale: ru })}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Time</span>
+                <span className="text-gray-600">Время</span>
                 <span className="font-medium">{selectedTime}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Price</span>
+                <span className="text-gray-600">Цена</span>
                 <span className="font-bold text-blue-600">
-                  ${selectedService?.price}
+                  {selectedService?.price} ₽
                 </span>
               </div>
             </div>
@@ -310,23 +311,23 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="name">Your Name *</Label>
+            <Label htmlFor="name">Ваше имя *</Label>
             <Input
               id="name"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="John Doe"
+              placeholder="Иван"
               required
             />
           </div>
           <div>
-            <Label htmlFor="phone">Phone (optional)</Label>
+            <Label htmlFor="phone">Телефон (необязательно)</Label>
             <Input
               id="phone"
               type="tel"
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="+1 (555) 000-0000"
+              placeholder="+7 (900) 000-00-00"
             />
           </div>
           <Button
@@ -334,7 +335,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
             onClick={handleBooking}
             disabled={!customerName || loading}
           >
-            {loading ? "Booking..." : "Confirm Booking"}
+            {loading ? "Бронируем..." : "Подтвердить запись"}
           </Button>
           {error && (
             <p className="text-sm text-red-500 text-center">{error}</p>
@@ -351,25 +352,25 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <Check className="h-8 w-8 text-green-600" />
         </div>
-        <h2 className="text-xl font-bold mb-2">Booking Confirmed!</h2>
+        <h2 className="text-xl font-bold mb-2">Запись подтверждена!</h2>
         <p className="text-gray-600 mb-4">
-          Your appointment has been booked successfully.
+          Ваша запись успешно создана.
         </p>
         <Card className="mb-6">
           <CardContent className="p-4">
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-gray-600">Service</span>
+                <span className="text-gray-600">Услуга</span>
                 <span className="font-medium">{selectedService?.title}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Date</span>
+                <span className="text-gray-600">Дата</span>
                 <span className="font-medium">
-                  {selectedDate && format(selectedDate, "MMM d, yyyy")}
+                  {selectedDate && format(selectedDate, "d MMM yyyy", { locale: ru })}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Time</span>
+                <span className="text-gray-600">Время</span>
                 <span className="font-medium">{selectedTime}</span>
               </div>
             </div>
@@ -386,7 +387,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
             setCustomerPhone("");
           }}
         >
-          Book Another Appointment
+          Записаться ещё
         </Button>
       </div>
     );

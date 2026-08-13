@@ -12,21 +12,21 @@ export default function BookingsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">Bookings</h1>
+        <h1 className="text-3xl font-bold">Бронирования</h1>
         <div className="flex gap-2">
           <Button
             variant={view === "list" ? "default" : "outline"}
             onClick={() => setView("list")}
           >
             <List className="h-4 w-4 mr-2" />
-            List
+            Список
           </Button>
           <Button
             variant={view === "calendar" ? "default" : "outline"}
             onClick={() => setView("calendar")}
           >
             <Calendar className="h-4 w-4 mr-2" />
-            Calendar
+            Календарь
           </Button>
         </div>
       </div>

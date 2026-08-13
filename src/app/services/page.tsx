@@ -45,9 +45,9 @@ export default function ServicesPage() {
             (colorScheme === "dark" ? "#ffffff" : "#000000"),
         }}
       >
-        <h1 className="text-lg font-bold mb-2">Business not found</h1>
+        <h1 className="text-lg font-bold mb-2">Бизнес не найден</h1>
         <p className="text-sm opacity-70">
-          Open this app from your business messenger bot to get started.
+          Откройте это приложение из бота вашего бизнеса в мессенджере.
         </p>
       </div>
     );
