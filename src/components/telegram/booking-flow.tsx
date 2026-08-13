@@ -31,6 +31,38 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Temporary debug helper - reports client-side errors to the debug log
+  const reportDebug = (event: string, text: string, detail: object) => {
+    fetch("/api/debug-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        business_id: businessId,
+        event,
+        update_text: text,
+        detail,
+      }),
+    }).catch(() => {});
+  };
+
+  // Report any uncaught JS error on this page
+  useEffect(() => {
+    const onError = (ev: ErrorEvent) =>
+      reportDebug("window_error", ev.message || "", {
+        stack: ev.error?.stack || "",
+        source: `${ev.filename}:${ev.lineno}`,
+      });
+    const onRejection = (ev: PromiseRejectionEvent) =>
+      reportDebug("unhandled_rejection", String(ev.reason || ""), {});
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Fetch services. If the flow was opened with a preselected service
   // (e.g. from the services catalog), jump straight to the calendar step.
   useEffect(() => {
@@ -70,35 +102,49 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
   }, [selectedDate, selectedService, businessId]);
 
   const handleBooking = async () => {
-    if (!selectedService || !selectedDate || !selectedTime || !customerName) return;
+    try {
+      if (!selectedService || !selectedDate || !selectedTime || !customerName) {
+        reportDebug("booking_skipped", "", { selectedService: !!selectedService, selectedDate: !!selectedDate, selectedTime, customerName: !!customerName });
+        return;
+      }
 
-    webApp.HapticFeedback.notificationOccurred("success");
-    setLoading(true);
-    setError(null);
-    const res = await fetch("/api/bookings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        service_id: selectedService.id,
-        user_id: businessId,
-        booking_date: format(selectedDate, "yyyy-MM-dd"),
-        booking_time: selectedTime,
-        customer_name: customerName,
-        customer_phone: customerPhone || null,
-        initData,
-        platform,
-      }),
-    });
-
-    if (res.ok) {
+      reportDebug("booking_submit", `time=${selectedTime}`, {
+        service: selectedService.id,
+        date: format(selectedDate, "yyyy-MM-dd"),
+      });
       webApp.HapticFeedback.notificationOccurred("success");
-      setStep("success");
-    } else {
-      const data = await res.json();
-      webApp.HapticFeedback.notificationOccurred("error");
-      setError(data.error || "Something went wrong. Please try again.");
+      setLoading(true);
+      setError(null);
+      const res = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_id: selectedService.id,
+          user_id: businessId,
+          booking_date: format(selectedDate, "yyyy-MM-dd"),
+          booking_time: selectedTime,
+          customer_name: customerName,
+          customer_phone: customerPhone || null,
+          initData,
+          platform,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      reportDebug("booking_response", `status=${res.status}`, { body: data });
+
+      if (res.ok) {
+        webApp.HapticFeedback.notificationOccurred("success");
+        setStep("success");
+      } else {
+        webApp.HapticFeedback.notificationOccurred("error");
+        setError(data.error || "Something went wrong. Please try again.");
+      }
+      setLoading(false);
+    } catch (e) {
+      setLoading(false);
+      reportDebug("booking_error", "", { error: String(e), stack: e instanceof Error ? e.stack : "" });
     }
-    setLoading(false);
   };
 
   // Step 1: Select Service
@@ -192,9 +238,14 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
                     variant={selectedTime === slot.time ? "default" : "outline"}
                     disabled={!slot.available}
                     onClick={() => {
-                      webApp.HapticFeedback.selectionChanged();
-                      setSelectedTime(slot.time);
-                      setStep("confirm");
+                      try {
+                        reportDebug("time_clicked", `time=${slot.time}`, { step });
+                        webApp.HapticFeedback.selectionChanged();
+                        setSelectedTime(slot.time);
+                        setStep("confirm");
+                      } catch (e) {
+                        reportDebug("time_click_error", `time=${slot.time}`, { error: String(e) });
+                      }
                     }}
                     className="text-sm"
                   >
