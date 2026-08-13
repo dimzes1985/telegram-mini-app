@@ -77,22 +77,32 @@ type RawWebApp = Record<string, unknown> & {
 };
 
 function adaptTelegramWebApp(app: RawWebApp): MessengerWebApp {
+  // The Telegram SDK methods (HapticFeedback etc.) rely on `this`, so they must
+  // be bound to their original object before being detached and reused.
+  const bindMethod = <T,>(fn: T | undefined, ctx: object | undefined): T =>
+    (typeof fn === "function" && ctx ? (fn as (...a: unknown[]) => unknown).bind(ctx) : (() => {})) as T;
+
+  const haptics = app.HapticFeedback;
   return {
-    ready: typeof app.ready === "function" ? app.ready : () => {},
-    expand: typeof app.expand === "function" ? app.expand : () => {},
+    ready: bindMethod(app.ready, app),
+    expand: bindMethod(app.expand, app),
     initData: app.initData || "",
     initDataUnsafe: app.initDataUnsafe || {},
     themeParams: app.themeParams || {},
     colorScheme: app.colorScheme || "light",
     HapticFeedback: {
-      impactOccurred: app.HapticFeedback?.impactOccurred ?? (() => {}),
-      notificationOccurred: app.HapticFeedback?.notificationOccurred ?? (() => {}),
-      selectionChanged: app.HapticFeedback?.selectionChanged ?? (() => {}),
+      impactOccurred: bindMethod(haptics?.impactOccurred, haptics),
+      notificationOccurred: bindMethod(haptics?.notificationOccurred, haptics),
+      selectionChanged: bindMethod(haptics?.selectionChanged, haptics),
     },
   };
 }
 
 function adaptMaxWebApp(app: RawWebApp): MessengerWebApp {
+  const bindMethod = <T,>(fn: T | undefined, ctx: object | undefined): T =>
+    (typeof fn === "function" && ctx ? (fn as (...a: unknown[]) => unknown).bind(ctx) : (() => {})) as T;
+
+  const haptics = app.HapticFeedback;
   return {
     // MAX Bridge has no ready()/expand()
     ready: () => {},
@@ -103,9 +113,9 @@ function adaptMaxWebApp(app: RawWebApp): MessengerWebApp {
     themeParams: {},
     colorScheme: "light",
     HapticFeedback: {
-      impactOccurred: app.HapticFeedback?.impactOccurred ?? (() => {}),
-      notificationOccurred: app.HapticFeedback?.notificationOccurred ?? (() => {}),
-      selectionChanged: app.HapticFeedback?.selectionChanged ?? (() => {}),
+      impactOccurred: bindMethod(haptics?.impactOccurred, haptics),
+      notificationOccurred: bindMethod(haptics?.notificationOccurred, haptics),
+      selectionChanged: bindMethod(haptics?.selectionChanged, haptics),
     },
   };
 }

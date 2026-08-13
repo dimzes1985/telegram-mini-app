@@ -240,9 +240,9 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
                     onClick={() => {
                       try {
                         reportDebug("time_clicked", `time=${slot.time}`, { step });
-                        webApp.HapticFeedback.selectionChanged();
                         setSelectedTime(slot.time);
                         setStep("confirm");
+                        webApp.HapticFeedback.selectionChanged();
                       } catch (e) {
                         reportDebug("time_click_error", `time=${slot.time}`, { error: String(e) });
                       }
