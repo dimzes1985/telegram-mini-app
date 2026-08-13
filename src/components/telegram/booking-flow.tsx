@@ -19,6 +19,22 @@ interface BookingFlowProps {
 
 type Step = "services" | "datetime" | "confirm" | "success";
 
+interface WorkingHoursDay {
+  start: string;
+  end: string;
+  enabled: boolean;
+}
+
+const DAY_NAMES = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
 export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) {
   const { webApp, initData, platform } = useMessenger();
   const [step, setStep] = useState<Step>("services");
@@ -27,6 +43,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [workingHours, setWorkingHours] = useState<Record<string, WorkingHoursDay> | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [loading, setLoading] = useState(false);
@@ -89,6 +106,22 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
     };
   }, [businessId, initialServiceId]);
 
+  // Fetch business working hours so non-working days can be disabled
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/public/business-info?business_id=${businessId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled && data?.working_hours) {
+          setWorkingHours(data.working_hours);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [businessId]);
+
   // Fetch time slots when date and service are selected
   useEffect(() => {
     if (selectedDate && selectedService) {
@@ -101,6 +134,13 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
         .catch(() => setTimeSlots([]));
     }
   }, [selectedDate, selectedService, businessId]);
+
+  const isWorkingDay = (date: Date): boolean => {
+    if (!workingHours) return true;
+    const dayName = DAY_NAMES[date.getDay()];
+    const hours = workingHours[dayName];
+    return !!hours && hours.enabled;
+  };
 
   const handleBooking = async () => {
     try {
@@ -227,7 +267,9 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
             mode="single"
             selected={selectedDate}
             onSelect={(value) => setSelectedDate(value)}
-            disabled={(date: Date) => date < new Date()}
+            disabled={(date: Date) =>
+              date < new Date() || !isWorkingDay(date)
+            }
             className="rounded-md border"
           />
         </div>
@@ -237,7 +279,9 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
             <h3 className="font-medium mb-2">Доступное время</h3>
             {timeSlots.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-4">
-                Нет доступного времени на эту дату.
+                {isWorkingDay(selectedDate)
+                  ? "Нет свободного времени на эту дату."
+                  : "В этот день нет приёма. Выберите рабочий день."}
               </p>
             ) : (
               <div className="grid grid-cols-4 gap-2">
