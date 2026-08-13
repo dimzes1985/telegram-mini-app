@@ -109,7 +109,9 @@ export default function ServicesPage() {
                     </div>
                   </div>
                   <Link
-                    href={`/book?business_id=${businessId}&service_id=${service.id}`}
+                    href={`/book?business_id=${businessId}&service_id=${service.id}${
+                      typeof window !== "undefined" ? window.location.hash : ""
+                    }`}
                   >
                     <Button
                       className="w-full"
