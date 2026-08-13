@@ -111,6 +111,14 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
       reportDebug("booking_submit", `time=${selectedTime}`, {
         service: selectedService.id,
         date: format(selectedDate, "yyyy-MM-dd"),
+        initDataLen: (initData || "").length,
+        platform,
+        hasTelegram:
+          typeof window !== "undefined" &&
+          !!(
+            window as unknown as { Telegram?: { WebApp?: unknown } }
+          ).Telegram?.WebApp,
+        url: typeof window !== "undefined" ? window.location.href : "",
       });
       webApp.HapticFeedback.notificationOccurred("success");
       setLoading(true);
