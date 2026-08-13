@@ -67,7 +67,7 @@ export async function POST(req: Request) {
       await createYookassaPayment({
         amount: price,
         description: `Подписка ${PLANS[plan].name} (продление)`,
-        returnUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        returnUrl: (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").trim(),
         savePaymentMethod: true,
         paymentMethodId: sub.yookassa_payment_method_id,
         metadata: {

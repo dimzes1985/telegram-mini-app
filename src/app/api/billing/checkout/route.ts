@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").trim();
   const returnUrl = `${baseUrl}/admin/billing?status=checkout`;
 
   const payment = await createYookassaPayment({

@@ -65,7 +65,7 @@ export async function POST(
   }
 
   const botToken = user.bot_token;
-  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").trim();
   const appUrl = `${appBaseUrl}/app?business_id=${user.id}`;
   const bookUrl = `${appBaseUrl}/book?business_id=${user.id}`;
   const infoText = buildBusinessInfoText(user);

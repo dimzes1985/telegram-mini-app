@@ -160,7 +160,7 @@ export async function GET() {
 
   try {
     const subscriptions = await getMaxSubscriptions(maxBotToken);
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").trim();
     const webhookUrl = `${baseUrl}/api/max/webhook/${user.id}`;
     const active = (subscriptions.subscriptions || []).some(
       (sub) => sub.url === webhookUrl
