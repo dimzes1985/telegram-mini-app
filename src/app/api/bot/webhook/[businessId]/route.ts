@@ -55,6 +55,11 @@ export async function POST(
   const chatId = message?.chat.id;
   const text = message?.text || "";
 
+  // Debug logging - record every incoming update and outgoing send result
+  await logWebhookEvent(user.id, chatId ?? null, "update", text || callbackData || "", {
+    update_id: update.update_id,
+  });
+
   if (!chatId) {
     return NextResponse.json({ ok: true });
   }
@@ -106,7 +111,7 @@ export async function POST(
         keyboard.inline_keyboard.push([
           { text: "ℹ️ О бизнесе", callback_data: "show_info" },
         ]);
-        await sendTelegramMessage(
+        const result = await sendTelegramMessage(
           botToken,
           chatId!,
           `👋 Добро пожаловать в <b>${user.business_name}</b>!\n\nЯ могу помочь вам:\n• Узнать об услугах\n• Записаться на прием\n• Получить информацию о бизнесе\n\nКак я могу вам помочь?`,
@@ -114,6 +119,7 @@ export async function POST(
             reply_markup: keyboard,
           }
         );
+        await logWebhookEvent(user.id, chatId!, "start_reply", "", result);
         break;
       }
 
@@ -217,9 +223,32 @@ export async function POST(
     return NextResponse.json({ ok: true });
   }
 
-  await sendTelegramMessageChunked(botToken, chatId, reply.text, {
+  const sendResults = await sendTelegramMessageChunked(botToken, chatId, reply.text, {
     reply_markup: buildQuickActionsKeyboard(appBaseUrl, user.id),
   });
+  await logWebhookEvent(user.id, chatId, "ai_reply", "", sendResults);
 
   return NextResponse.json({ ok: true });
+}
+
+// Temporary debug helper - records webhook activity to the bot_webhook_logs table
+async function logWebhookEvent(
+  userId: string,
+  chatId: number | null,
+  event: string,
+  updateText: string,
+  detail: object
+) {
+  try {
+    const client = createAdminClient();
+    await client.from("bot_webhook_logs").insert({
+      user_id: userId,
+      chat_id: chatId,
+      event,
+      update_text: (updateText || "").slice(0, 500),
+      detail: detail || {},
+    });
+  } catch {
+    // Never fail the webhook because of logging
+  }
 }

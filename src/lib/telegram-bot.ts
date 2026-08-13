@@ -152,20 +152,21 @@ export async function answerCallbackQuery(
 
 // Sends a long AI reply as plain text, splitting it into chunks that fit
 // Telegram's 4096-character message limit. If a reply_markup is provided it is
-// attached to the last chunk only.
+// attached to the last chunk only. Returns the responses from Telegram.
 export async function sendTelegramMessageChunked(
   botToken: string,
   chatId: number,
   text: string,
   options?: { reply_markup?: object }
-) {
+): Promise<Record<string, unknown>[]> {
   const MAX_CHARS = 4000;
   const url = `${TELEGRAM_API}/bot${botToken}/sendMessage`;
+  const results: Record<string, unknown>[] = [];
 
   for (let i = 0; i < text.length; i += MAX_CHARS) {
     const chunk = text.slice(i, i + MAX_CHARS);
     const isLast = i + MAX_CHARS >= text.length;
-    await fetch(url, {
+    const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify({
@@ -176,7 +177,10 @@ export async function sendTelegramMessageChunked(
           : {}),
       }),
     });
+    results.push(await response.json());
   }
+
+  return results;
 }
 
 export async function setBotCommands(
