@@ -5,6 +5,7 @@ import {
   sendTelegramMessageChunked,
   sendWebAppButton,
   sendServiceButtons,
+  buildQuickActionsKeyboard,
   answerCallbackQuery,
   type TelegramUpdate,
 } from "@/lib/telegram-bot";
@@ -59,7 +60,9 @@ export async function POST(
   }
 
   const botToken = user.bot_token;
-  const appUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/app?business_id=${user.id}`;
+  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = `${appBaseUrl}/app?business_id=${user.id}`;
+  const bookUrl = `${appBaseUrl}/book?business_id=${user.id}`;
   const infoText = buildBusinessInfoText(user);
 
   // Handle callback queries (button clicks)
@@ -74,7 +77,7 @@ export async function POST(
         .eq("active", true);
 
       if (services && services.length > 0) {
-        await sendServiceButtons(botToken, chatId!, services, appUrl);
+        await sendServiceButtons(botToken, chatId!, services, bookUrl);
       } else {
         await sendTelegramMessage(botToken, chatId!, "Услуги пока не добавлены.");
       }
@@ -82,8 +85,8 @@ export async function POST(
       await sendWebAppButton(
         botToken,
         chatId!,
-        "Откройте наше приложение для записи:",
-        appUrl,
+        "Готовы записаться? Выберите дату и время в приложении:",
+        bookUrl,
         "📅 Записаться"
       );
     } else if (callbackData === "show_info") {
@@ -98,28 +101,21 @@ export async function POST(
     const command = text.split(" ")[0].toLowerCase();
 
     switch (command) {
-      case "/start":
+      case "/start": {
+        const keyboard = buildQuickActionsKeyboard(appBaseUrl, user.id);
+        keyboard.inline_keyboard.push([
+          { text: "ℹ️ О бизнесе", callback_data: "show_info" },
+        ]);
         await sendTelegramMessage(
           botToken,
           chatId!,
           `👋 Добро пожаловать в <b>${user.business_name}</b>!\n\nЯ могу помочь вам:\n• Узнать об услугах\n• Записаться на прием\n• Получить информацию о бизнесе\n\nКак я могу вам помочь?`,
           {
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  { text: "📋 Наши услуги", callback_data: "show_services" },
-                ],
-                [
-                  { text: "ℹ️ О бизнесе", callback_data: "show_info" },
-                ],
-                [
-                  { text: "💬 Задать вопрос", web_app: { url: appUrl } },
-                ],
-              ],
-            },
+            reply_markup: keyboard,
           }
         );
         break;
+      }
 
       case "/help":
         await sendTelegramMessage(
@@ -146,12 +142,12 @@ export async function POST(
             await sendWebAppButton(
               botToken,
               chatId!,
-              "Готовы записаться? Откройте наше приложение:",
-              appUrl,
+              "Готовы записаться? Выберите дату и время в приложении:",
+              bookUrl,
               "📅 Записаться"
             );
           } else {
-            await sendServiceButtons(botToken, chatId!, services, appUrl);
+            await sendServiceButtons(botToken, chatId!, services, bookUrl);
           }
         } else {
           await sendTelegramMessage(
@@ -221,7 +217,9 @@ export async function POST(
     return NextResponse.json({ ok: true });
   }
 
-  await sendTelegramMessageChunked(botToken, chatId, reply.text);
+  await sendTelegramMessageChunked(botToken, chatId, reply.text, {
+    reply_markup: buildQuickActionsKeyboard(appBaseUrl, user.id),
+  });
 
   return NextResponse.json({ ok: true });
 }

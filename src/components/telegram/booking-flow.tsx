@@ -13,11 +13,12 @@ import { format } from "date-fns";
 
 interface BookingFlowProps {
   businessId: string;
+  initialServiceId?: string | null;
 }
 
 type Step = "services" | "datetime" | "confirm" | "success";
 
-export function BookingFlow({ businessId }: BookingFlowProps) {
+export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) {
   const { webApp, initData, platform } = useMessenger();
   const [step, setStep] = useState<Step>("services");
   const [services, setServices] = useState<Service[]>([]);
@@ -30,13 +31,30 @@ export function BookingFlow({ businessId }: BookingFlowProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch services
+  // Fetch services. If the flow was opened with a preselected service
+  // (e.g. from the services catalog), jump straight to the calendar step.
   useEffect(() => {
+    let cancelled = false;
     fetch(`/api/public/services?business_id=${businessId}`)
       .then((res) => res.json())
-      .then(setServices)
-      .catch(() => setServices([]));
-  }, [businessId]);
+      .then((list: Service[]) => {
+        if (cancelled) return;
+        setServices(list);
+        if (initialServiceId) {
+          const service = list.find((s) => s.id === initialServiceId);
+          if (service) {
+            setSelectedService(service);
+            setStep("datetime");
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setServices([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [businessId, initialServiceId]);
 
   // Fetch time slots when date and service are selected
   useEffect(() => {

@@ -28,6 +28,12 @@ export interface TelegramUpdate {
   };
 }
 
+export interface InlineKeyboardButton {
+  text: string;
+  callback_data?: string;
+  web_app?: { url: string };
+}
+
 export async function sendTelegramMessage(
   botToken: string,
   chatId: number,
@@ -72,6 +78,28 @@ export async function sendWebAppButton(
   });
 }
 
+// Builds the quick-action keyboard with web app buttons that open the
+// services catalog and the booking calendar inside the mini app.
+export function buildQuickActionsKeyboard(
+  appBaseUrl: string,
+  businessId: string
+): { inline_keyboard: InlineKeyboardButton[][] } {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: "📋 Услуги",
+          web_app: { url: `${appBaseUrl}/services?business_id=${businessId}` },
+        },
+        {
+          text: "📅 Записаться",
+          web_app: { url: `${appBaseUrl}/book?business_id=${businessId}` },
+        },
+      ],
+    ],
+  };
+}
+
 export async function sendServiceButtons(
   botToken: string,
   chatId: number,
@@ -88,7 +116,7 @@ export async function sendServiceButtons(
     return [
       {
         text: `${title} - ${service.price} ₽`,
-        web_app: { url: `${webAppUrl}?service=${service.id}` },
+        web_app: { url: `${webAppUrl}&service_id=${service.id}` },
       },
     ];
   });
@@ -123,23 +151,29 @@ export async function answerCallbackQuery(
 }
 
 // Sends a long AI reply as plain text, splitting it into chunks that fit
-// Telegram's 4096-character message limit.
+// Telegram's 4096-character message limit. If a reply_markup is provided it is
+// attached to the last chunk only.
 export async function sendTelegramMessageChunked(
   botToken: string,
   chatId: number,
-  text: string
+  text: string,
+  options?: { reply_markup?: object }
 ) {
   const MAX_CHARS = 4000;
   const url = `${TELEGRAM_API}/bot${botToken}/sendMessage`;
 
   for (let i = 0; i < text.length; i += MAX_CHARS) {
     const chunk = text.slice(i, i + MAX_CHARS);
+    const isLast = i + MAX_CHARS >= text.length;
     await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify({
         chat_id: chatId,
         text: chunk,
+        ...(isLast && options?.reply_markup
+          ? { reply_markup: options.reply_markup }
+          : {}),
       }),
     });
   }
