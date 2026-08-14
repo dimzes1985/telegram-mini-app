@@ -49,38 +49,6 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Temporary debug helper - reports client-side errors to the debug log
-  const reportDebug = (event: string, text: string, detail: object) => {
-    fetch("/api/debug-log", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        business_id: businessId,
-        event,
-        update_text: text,
-        detail,
-      }),
-    }).catch(() => {});
-  };
-
-  // Report any uncaught JS error on this page
-  useEffect(() => {
-    const onError = (ev: ErrorEvent) =>
-      reportDebug("window_error", ev.message || "", {
-        stack: ev.error?.stack || "",
-        source: `${ev.filename}:${ev.lineno}`,
-      });
-    const onRejection = (ev: PromiseRejectionEvent) =>
-      reportDebug("unhandled_rejection", String(ev.reason || ""), {});
-    window.addEventListener("error", onError);
-    window.addEventListener("unhandledrejection", onRejection);
-    return () => {
-      window.removeEventListener("error", onError);
-      window.removeEventListener("unhandledrejection", onRejection);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Fetch services. If the flow was opened with a preselected service
   // (e.g. from the services catalog), jump straight to the calendar step.
   useEffect(() => {
@@ -145,22 +113,9 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
   const handleBooking = async () => {
     try {
       if (!selectedService || !selectedDate || !selectedTime || !customerName) {
-        reportDebug("booking_skipped", "", { selectedService: !!selectedService, selectedDate: !!selectedDate, selectedTime, customerName: !!customerName });
         return;
       }
 
-      reportDebug("booking_submit", `time=${selectedTime}`, {
-        service: selectedService.id,
-        date: format(selectedDate, "yyyy-MM-dd"),
-        initDataLen: (initData || "").length,
-        platform,
-        hasTelegram:
-          typeof window !== "undefined" &&
-          !!(
-            window as unknown as { Telegram?: { WebApp?: unknown } }
-          ).Telegram?.WebApp,
-        url: typeof window !== "undefined" ? window.location.href : "",
-      });
       webApp.HapticFeedback.notificationOccurred("success");
       setLoading(true);
       setError(null);
@@ -180,7 +135,6 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
       });
 
       const data = await res.json().catch(() => ({}));
-      reportDebug("booking_response", `status=${res.status}`, { body: data });
 
       if (res.ok) {
         webApp.HapticFeedback.notificationOccurred("success");
@@ -190,9 +144,8 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
         setError(data.error || "Что-то пошло не так. Попробуйте ещё раз.");
       }
       setLoading(false);
-    } catch (e) {
+    } catch {
       setLoading(false);
-      reportDebug("booking_error", "", { error: String(e), stack: e instanceof Error ? e.stack : "" });
     }
   };
 
@@ -291,14 +244,9 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
                     variant={selectedTime === slot.time ? "default" : "outline"}
                     disabled={!slot.available}
                     onClick={() => {
-                      try {
-                        reportDebug("time_clicked", `time=${slot.time}`, { step });
-                        setSelectedTime(slot.time);
-                        setStep("confirm");
-                        webApp.HapticFeedback.selectionChanged();
-                      } catch (e) {
-                        reportDebug("time_click_error", `time=${slot.time}`, { error: String(e) });
-                      }
+                      setSelectedTime(slot.time);
+                      setStep("confirm");
+                      webApp.HapticFeedback.selectionChanged();
                     }}
                     className="text-sm"
                   >

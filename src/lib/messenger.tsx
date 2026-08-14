@@ -272,28 +272,6 @@ export function MessengerProvider({ children }: { children: ReactNode }) {
           // ignore
         }
       }
-      // Temporary debug log - which platform each page detects
-      try {
-        fetch("/api/debug-log", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            business_id: null,
-            event: "provider_detect",
-            update_text: window.location.href.slice(0, 300),
-            detail: {
-              platform,
-              initDataLen: webApp.initData.length,
-              hash: window.location.hash.slice(0, 40),
-              hasTelegram: !!(window as unknown as { Telegram?: { WebApp?: unknown } })
-                .Telegram?.WebApp,
-              hasWebApp: !!(window as unknown as { WebApp?: unknown }).WebApp,
-            },
-          }),
-        }).catch(() => {});
-      } catch {
-        // ignore
-      }
       setState({ platform, webApp, isReady: true });
     });
     return () => {
