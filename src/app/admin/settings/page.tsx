@@ -53,6 +53,7 @@ export default function SettingsPage() {
   const [maxBotUsername, setMaxBotUsername] = useState("");
   const [maxBotTokenSet, setMaxBotTokenSet] = useState(false);
   const [maxBotWebhookSet, setMaxBotWebhookSet] = useState(false);
+  const [businessId, setBusinessId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -68,6 +69,7 @@ export default function SettingsPage() {
       .then((res) => res.json())
       .then((data) => {
         setBusinessName(data.business_name || "");
+        setBusinessId(data.id || "");
         setBusinessDescription(data.business_description || "");
         setBusinessAddress(data.business_address || "");
         setBusinessPhone(data.business_phone || "");
@@ -388,9 +390,9 @@ export default function SettingsPage() {
               <p className="text-sm text-gray-500 mt-1">
                 После сохранения подключите мини-приложение к боту: укажите URL приложения{" "}
                 <code className="text-xs bg-gray-100 px-1 rounded">
-                  {`${typeof window !== "undefined" ? window.location.origin : ""}/app`}
+                  {`${typeof window !== "undefined" ? window.location.origin : ""}/b/${businessId || "…"}`}
                 </code>{" "}
-                на платформе MAX и создайте дип-ссылку для открытия из бота.
+                на платформе MAX (раздел «Чат-боты» → «Расширенные настройки» → «Настроить») и выберите вид кнопки (например, «Старт»).
               </p>
             </div>
 

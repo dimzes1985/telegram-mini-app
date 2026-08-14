@@ -67,6 +67,7 @@ export async function GET() {
 
   // Mask bot token for security
   const maskedData: Record<string, unknown> = {
+    id: user.id,
     ...data,
     ...botData,
     ...maxBotData,

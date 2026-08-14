@@ -114,21 +114,29 @@ export async function POST(
 
   const updateType = update.update_type;
 
+  const safe = async (fn: () => Promise<unknown>) => {
+    try {
+      await fn();
+    } catch (err) {
+      console.error("MAX webhook send failed:", err instanceof Error ? err.message : err);
+    }
+  };
+
   // Handle callback button presses
   if (updateType === "message_callback" && update.callback) {
     await answerMaxCallback(botToken, update.callback.callback_id);
 
     if (update.callback.payload === "show_services") {
-      await sendServices();
+      await safe(sendServices);
     } else if (update.callback.payload === "show_info") {
-      await sendMaxMessage(botToken, userId, infoText);
+      await safe(() => sendMaxMessage(botToken, userId, infoText));
     }
 
     return NextResponse.json({ ok: true });
   }
 
   if (updateType === "bot_started") {
-    await sendMenu();
+    await safe(sendMenu);
     return NextResponse.json({ ok: true });
   }
 
@@ -138,61 +146,65 @@ export async function POST(
 
     switch (command) {
       case "/start":
-        await sendMenu();
+        await safe(sendMenu);
         break;
 
       case "/help":
-        await sendMaxMessage(
-          botToken,
-          userId,
-          `📖 Доступные команды:\n\n/start - Приветствие\n/services - Наши услуги\n/info - Информация о бизнесе\n/help - Эта справка\n\nВы также можете просто написать сообщение, и я постараюсь помочь!`
+        await safe(() =>
+          sendMaxMessage(
+            botToken,
+            userId,
+            `📖 Доступные команды:\n\n/start - Приветствие\n/services - Наши услуги\n/info - Информация о бизнесе\n/help - Эта справка\n\nВы также можете просто написать сообщение, и я постараюсь помочь!`
+          )
         );
         break;
 
       case "/info":
-        await sendMaxMessage(botToken, userId, infoText);
+        await safe(() => sendMaxMessage(botToken, userId, infoText));
         break;
 
       case "/services":
-        await sendServices();
+        await safe(sendServices);
         break;
 
       case "/book":
-        if (botPublicName) {
-          await sendMaxMessage(
-            botToken,
-            userId,
-            "Готовы записаться? Откройте наше приложение:",
-            [[maxOpenAppButton("📅 Записаться", botPublicName, String(user.id))]]
-          );
-        } else {
-          await sendMaxMessage(
+        await safe(() => {
+          if (botPublicName) {
+            return sendMaxMessage(
+              botToken,
+              userId,
+              "Готовы записаться? Откройте наше приложение:",
+              [[maxOpenAppButton("📅 Записаться", botPublicName, String(user.id))]]
+            );
+          }
+          return sendMaxMessage(
             botToken,
             userId,
             "Запись через приложение временно недоступна. Напишите нам, и мы подберём время."
           );
-        }
+        });
         break;
 
       default:
-        if (text.startsWith("/")) {
-          await sendMaxMessage(
-            botToken,
-            userId,
-            "Неизвестная команда. Напишите /help для списка доступных команд."
-          );
-        } else {
+        await safe(() => {
+          if (text.startsWith("/")) {
+            return sendMaxMessage(
+              botToken,
+              userId,
+              "Неизвестная команда. Напишите /help для списка доступных команд."
+            );
+          }
           const buttons: ReturnType<typeof maxOpenAppButton>[][] = [];
           if (botPublicName) {
             buttons.push([maxOpenAppButton("📅 Записаться", botPublicName, String(user.id))]);
           }
-          await sendMaxMessage(
+          return sendMaxMessage(
             botToken,
             userId,
             "Спасибо за ваше сообщение! Для более подробной помощи, пожалуйста, воспользуйтесь нашим приложением.",
             buttons
           );
-        }
+        });
     }
 
     return NextResponse.json({ ok: true });

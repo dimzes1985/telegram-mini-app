@@ -71,7 +71,7 @@ export async function POST() {
     secret = generateSecret();
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").trim();
   const webhookUrl = `${baseUrl}/api/max/webhook/${user.id}`;
 
   try {
