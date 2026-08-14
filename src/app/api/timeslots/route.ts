@@ -82,10 +82,18 @@ export async function GET(req: Request) {
 
   // Generate time slots based on working hours
   const slots = [];
+  const isToday = dateObj.toDateString() === new Date().toDateString();
   for (let minutes = startMinutes; minutes < endMinutes; minutes += 30) {
     const hour = Math.floor(minutes / 60);
     const min = minutes % 60;
     const time = `${hour.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
+    if (isToday) {
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      if (minutes < nowMinutes) {
+        continue;
+      }
+    }
     slots.push({
       time,
       available: !bookedTimes.has(time),

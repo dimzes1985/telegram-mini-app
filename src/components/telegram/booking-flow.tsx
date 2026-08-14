@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { useMessenger } from "@/lib/messenger";
 import { ArrowLeft, Check } from "lucide-react";
 import { Service, TimeSlot } from "@/types";
-import { format } from "date-fns";
+import { format, startOfDay } from "date-fns";
 import { ru } from "date-fns/locale";
 
 interface BookingFlowProps {
@@ -221,7 +221,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
             selected={selectedDate}
             onSelect={(value) => setSelectedDate(value)}
             disabled={(date: Date) =>
-              date < new Date() || !isWorkingDay(date)
+              date < startOfDay(new Date()) || !isWorkingDay(date)
             }
             className="rounded-md border"
           />
