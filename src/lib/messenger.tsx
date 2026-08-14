@@ -204,6 +204,48 @@ function loadMaxBridge(): Promise<RawWebApp | null> {
   });
 }
 
+// MAX Bridge passes initData in the URL hash (#WebAppData=...). When the bridge
+// object is not yet populated, we can build the WebApp state directly from the
+// hash, exactly as we do for Telegram (#tgWebAppData=...).
+function maxAppFromHash(): {
+  platform: MessengerPlatform;
+  webApp: MessengerWebApp;
+} | null {
+  if (typeof window === "undefined") return null;
+  const hash = window.location.hash;
+  if (!hash.includes("WebAppData=")) return null;
+
+  try {
+    const params = new URLSearchParams(hash.replace(/^#/, ""));
+    const webAppData = params.get("WebAppData");
+    if (!webAppData) return null;
+
+    const initData = webAppData;
+
+    const initDataUnsafe: MessengerWebApp["initDataUnsafe"] = {};
+    const parsed = new URLSearchParams(decodeURIComponent(initData));
+    const userRaw = parsed.get("user");
+    if (userRaw) initDataUnsafe.user = JSON.parse(userRaw);
+    const startParam = parsed.get("start_param");
+    if (startParam) initDataUnsafe.start_param = startParam;
+
+    return {
+      platform: "max",
+      webApp: {
+        ready: () => {},
+        expand: () => {},
+        initData,
+        initDataUnsafe,
+        themeParams: {},
+        colorScheme: "light",
+        HapticFeedback: noopHaptic,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function detectWebApp(): Promise<{
   platform: MessengerPlatform;
   webApp: MessengerWebApp;
@@ -233,10 +275,23 @@ async function detectWebApp(): Promise<{
     return { platform: "max", webApp: adaptMaxWebApp(win.WebApp) };
   }
 
+  // MAX Bridge passes initData via the URL hash (#WebAppData=...). If the bridge
+  // object is not present, fall back to the hash (covers the MAX web/desktop case).
+  const fromMaxHash = maxAppFromHash();
+  if (fromMaxHash) {
+    return fromMaxHash;
+  }
+
   // Try loading the MAX Bridge script
   const maxApp = await loadMaxBridge();
   if (maxApp) {
     return { platform: "max", webApp: adaptMaxWebApp(maxApp) };
+  }
+
+  // MAX data may still be in the hash even if the bridge script failed to load
+  const fromMaxHashLate = maxAppFromHash();
+  if (fromMaxHashLate) {
+    return fromMaxHashLate;
   }
 
   // Fallback to the Telegram SDK wrapper
