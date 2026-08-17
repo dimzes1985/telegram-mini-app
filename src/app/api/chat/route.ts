@@ -1,4 +1,4 @@
-import { streamText } from "ai";
+import { convertToModelMessages, streamText } from "ai";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyInitData } from "@/lib/telegram-auth";
 import { verifyMaxInitData } from "@/lib/max-auth";
@@ -92,10 +92,17 @@ export async function POST(req: Request) {
 
   const systemPrompt = buildSystemPrompt(user, services ?? []);
 
+  // The client (useChat + DefaultChatTransport) sends messages in UIMessage
+  // format ({ id, role, parts }). streamText expects ModelMessage[] (with
+  // `content`), so convert when parts are present.
+  const modelMessages = Array.isArray(messages?.[0]?.parts)
+    ? await convertToModelMessages(messages)
+    : messages;
+
   const result = streamText({
     model: getAiModel(),
     system: systemPrompt,
-    messages,
+    messages: modelMessages,
     onFinish: async () => {
       // Count the assistant response toward the monthly quota
       await incrementAiUsage(supabase, businessId);
