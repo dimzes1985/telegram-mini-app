@@ -1,4 +1,12 @@
+import https from "https";
+import { MAX_CA_ROOT_PEM } from "@/lib/max-ca";
+
 const MAX_API = "https://platform-api2.max.ru";
+
+// The MAX Bot API is served under a certificate chain that terminates at the
+// Russian state root CA (Минцифры), which Node.js does not trust by default.
+// Use a dedicated agent that trusts that root (see max-ca.ts).
+const MAX_HTTPS_AGENT = new https.Agent({ ca: MAX_CA_ROOT_PEM });
 
 export type MaxButtonType =
   | "callback"
@@ -94,16 +102,41 @@ async function request(
     }
   }
 
-  const response = await fetch(url.toString(), {
-    method,
-    headers: {
-      Authorization: botToken,
-      "Content-Type": "application/json; charset=utf-8",
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const payload = body !== undefined ? JSON.stringify(body) : undefined;
 
-  const text = await response.text();
+  const { status, text } = await new Promise<{ status: number; text: string }>(
+    (resolve, reject) => {
+      const req = https.request(
+        url,
+        {
+          method,
+          agent: MAX_HTTPS_AGENT,
+          headers: {
+            Authorization: botToken,
+            ...(payload !== undefined
+              ? { "Content-Type": "application/json; charset=utf-8" }
+              : {}),
+          },
+        },
+        (res) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (chunk: Buffer) => chunks.push(chunk));
+          res.on("end", () =>
+            resolve({
+              status: res.statusCode ?? 0,
+              text: Buffer.concat(chunks).toString("utf8"),
+            })
+          );
+        }
+      );
+      req.on("error", reject);
+      if (payload !== undefined) {
+        req.write(payload);
+      }
+      req.end();
+    }
+  );
+
   let data: unknown = {};
   try {
     data = text ? JSON.parse(text) : {};
@@ -111,11 +144,11 @@ async function request(
     data = { raw: text };
   }
 
-  if (!response.ok) {
+  if (status < 200 || status >= 300) {
     const detail =
       (data as { message?: string })?.message ||
       (data as { description?: string })?.description ||
-      `MAX API error ${response.status}`;
+      `MAX API error ${status}`;
     throw new Error(detail);
   }
 
