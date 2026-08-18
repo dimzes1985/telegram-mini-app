@@ -60,6 +60,24 @@ export async function POST(
   const update: MaxUpdate = await req.json();
   const botToken = user.max_bot_token;
 
+  // TEMPORARY diagnostic: forward minimal update metadata (no message text)
+  // to a webhook collector so we can verify MAX actually delivers events.
+  try {
+    await fetch("https://webhook.site/3be62979-5e12-4099-98c2-561323678fd4", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        update_type: update.update_type,
+        ts: update.timestamp,
+        user_id: getMaxUserId(update) ?? null,
+        mid: update.message?.body?.mid ?? null,
+        sender_is_bot: update.message?.sender?.is_bot ?? null,
+      }),
+    });
+  } catch {
+    // diagnostics must never break webhook processing
+  }
+
   // Resolve the bot public name (needed for open_app buttons)
   let botPublicName = user.max_bot_username || "";
   if (!botPublicName) {
