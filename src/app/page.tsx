@@ -250,7 +250,7 @@ export default function Home() {
             </Badge>
           </div>
           <h1 className="hero-in-delay-1 mx-auto max-w-3xl text-4xl font-bold leading-tight tracking-tight text-gray-900 md:text-6xl">
-            Запись клиентов в Telegram{" "}
+            Запись клиентов в Telegram и MAX{" "}
             <span className="text-gradient font-extrabold">
               без звонков и администратора
             </span>

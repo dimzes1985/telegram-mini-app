@@ -93,7 +93,13 @@ function BillingContent() {
     return <div className="text-center py-12 text-gray-500">Загрузка...</div>;
   }
 
-  const plans = status ? [...status.available_plans, FREE_PLAN].sort((a, b) => a.price_monthly_rub - b.price_monthly_rub) : [FREE_PLAN];
+  // available_plans already includes the free plan (PLANS contains it),
+  // so only fall back to FREE_PLAN when the API returns nothing.
+  const plans = status
+    ? status.available_plans.length > 0
+      ? [...status.available_plans].sort((a, b) => a.price_monthly_rub - b.price_monthly_rub)
+      : [FREE_PLAN]
+    : [FREE_PLAN];
   const currentPlan = status?.current_plan || "free";
 
   return (
