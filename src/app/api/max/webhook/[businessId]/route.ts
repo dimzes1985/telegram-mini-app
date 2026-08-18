@@ -18,6 +18,20 @@ const WELCOME_MENU_ITEMS: Array<[string, string]> = [
   ["show_info", "ℹ️ О бизнесе"],
 ];
 
+// TEMPORARY diagnostics endpoint (collector)
+const DIAG_URL = "https://webhook.site/3be62979-5e12-4099-98c2-561323678fd4";
+async function diag(obj: Record<string, unknown>): Promise<void> {
+  try {
+    await fetch(DIAG_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(obj),
+    });
+  } catch {
+    // diagnostics must never break webhook processing
+  }
+}
+
 function plainInfoText(user: BusinessInfo): string {
   // MAX bot messages are plain text (no HTML), so strip tags from the shared builder output
   return buildBusinessInfoText(user).replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
@@ -62,21 +76,13 @@ export async function POST(
 
   // TEMPORARY diagnostic: forward minimal update metadata (no message text)
   // to a webhook collector so we can verify MAX actually delivers events.
-  try {
-    await fetch("https://webhook.site/3be62979-5e12-4099-98c2-561323678fd4", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        update_type: update.update_type,
-        ts: update.timestamp,
-        user_id: getMaxUserId(update) ?? null,
-        mid: update.message?.body?.mid ?? null,
-        sender_is_bot: update.message?.sender?.is_bot ?? null,
-      }),
-    });
-  } catch {
-    // diagnostics must never break webhook processing
-  }
+  await diag({
+    update_type: update.update_type,
+    ts: update.timestamp,
+    user_id: getMaxUserId(update) ?? null,
+    mid: update.message?.body?.mid ?? null,
+    sender_is_bot: update.message?.sender?.is_bot ?? null,
+  });
 
   // Resolve the bot public name (needed for open_app buttons)
   let botPublicName = user.max_bot_username || "";
@@ -138,7 +144,13 @@ export async function POST(
     try {
       await fn();
     } catch (err) {
-      console.error("MAX webhook send failed:", err instanceof Error ? err.message : err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("MAX webhook send failed:", msg);
+      await diag({
+        event: "send_failed",
+        mid: update.message?.body?.mid ?? null,
+        error: msg,
+      });
     }
   };
 
@@ -163,6 +175,12 @@ export async function POST(
   if (updateType === "message_created") {
     const text = update.message?.body?.text || "";
     const command = text.split(" ")[0].toLowerCase();
+    await diag({
+      event: "message_created_start",
+      mid: update.message?.body?.mid ?? null,
+      command,
+      text: text.slice(0, 80),
+    });
 
     // Ignore messages the bot itself sent (MAX echoes bot sends back as
     // message_created updates); otherwise we'd answer our own messages.
@@ -240,6 +258,13 @@ export async function POST(
             { role: "user", content: text },
           ]);
 
+          await diag({
+            event: "ai_result",
+            mid: update.message?.body?.mid ?? null,
+            ok: reply.ok,
+            reason: reply.ok ? undefined : reply.reason,
+          });
+
           const bookButtons: ReturnType<typeof maxOpenAppButton>[][] = [];
           if (botPublicName) {
             bookButtons.push([
@@ -265,7 +290,12 @@ export async function POST(
 
           const answer =
             reply.text.length > 4000 ? reply.text.slice(0, 4000) : reply.text;
-          return sendMaxMessage(botToken, userId, answer, bookButtons);
+          const sent = await sendMaxMessage(botToken, userId, answer, bookButtons);
+          await diag({
+            event: "send_done",
+            mid: update.message?.body?.mid ?? null,
+            ok: Boolean(sent?.message),
+          });
         });
     }
 
