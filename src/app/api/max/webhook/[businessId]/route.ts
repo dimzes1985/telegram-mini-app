@@ -10,6 +10,8 @@ import {
   type MaxUpdate,
 } from "@/lib/max-bot";
 import { buildBusinessInfoText, type BusinessInfo } from "@/lib/business-info";
+import { generateAiReply } from "@/lib/ai-assistant";
+import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 
 const WELCOME_MENU_ITEMS: Array<[string, string]> = [
   ["show_services", "📋 Наши услуги"],
@@ -144,6 +146,12 @@ export async function POST(
     const text = update.message?.body?.text || "";
     const command = text.split(" ")[0].toLowerCase();
 
+    // Ignore messages the bot itself sent (MAX echoes bot sends back as
+    // message_created updates); otherwise we'd answer our own messages.
+    if (update.message?.sender?.is_bot) {
+      return NextResponse.json({ ok: true });
+    }
+
     switch (command) {
       case "/start":
         await safe(sendMenu);
@@ -186,7 +194,7 @@ export async function POST(
         break;
 
       default:
-        await safe(() => {
+        await safe(async () => {
           if (text.startsWith("/")) {
             return sendMaxMessage(
               botToken,
@@ -194,16 +202,52 @@ export async function POST(
               "Неизвестная команда. Напишите /help для списка доступных команд."
             );
           }
-          const buttons: ReturnType<typeof maxOpenAppButton>[][] = [];
-          if (botPublicName) {
-            buttons.push([maxOpenAppButton("📅 Записаться", botPublicName, String(user.id))]);
+
+          // Free-form messages are answered by the AI assistant, mirroring the
+          // Telegram webhook behaviour.
+          pruneRateLimitBuckets();
+          const limit = rateLimit(`max:ai:${user.id}:${userId}`, {
+            windowMs: 60_000,
+            max: 10,
+          });
+          if (!limit.allowed) {
+            return sendMaxMessage(
+              botToken,
+              userId,
+              "Пожалуйста, подождите немного перед следующим вопросом 🙂"
+            );
           }
-          return sendMaxMessage(
-            botToken,
-            userId,
-            "Спасибо за ваше сообщение! Для более подробной помощи, пожалуйста, воспользуйтесь нашим приложением.",
-            buttons
-          );
+
+          const reply = await generateAiReply(user.id, [
+            { role: "user", content: text },
+          ]);
+
+          const bookButtons: ReturnType<typeof maxOpenAppButton>[][] = [];
+          if (botPublicName) {
+            bookButtons.push([
+              maxOpenAppButton("📅 Записаться", botPublicName, String(user.id)),
+            ]);
+          }
+
+          if (!reply.ok) {
+            if (reply.reason === "quota") {
+              return sendMaxMessage(
+                botToken,
+                userId,
+                "Извините, месячный лимит сообщений исчерпан. Пожалуйста, обратитесь к владельцу бизнеса."
+              );
+            }
+            return sendMaxMessage(
+              botToken,
+              userId,
+              "Извините, что-то пошло не так. Попробуйте ещё раз чуть позже или откройте наше приложение:",
+              bookButtons
+            );
+          }
+
+          const answer =
+            reply.text.length > 4000 ? reply.text.slice(0, 4000) : reply.text;
+          return sendMaxMessage(botToken, userId, answer, bookButtons);
         });
     }
 

@@ -22,6 +22,7 @@ export interface MaxUpdateUser {
   last_name?: string;
   username?: string;
   name?: string;
+  is_bot?: boolean;
   avatar_url?: string;
 }
 
