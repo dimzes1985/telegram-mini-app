@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAiUsage } from "@/lib/ai-usage";
 import { PLANS } from "@/lib/plans";
+import { getYookassaPaymentMethod } from "@/lib/yookassa";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +39,22 @@ export async function GET() {
       .select("*")
       .eq("user_id", user.id)
       .maybeSingle();
+
+    // Enrich with saved payment method details (card brand / last4)
+    if (subData?.yookassa_payment_method_id) {
+      try {
+        const pm = await getYookassaPaymentMethod(
+          subData.yookassa_payment_method_id
+        );
+        subData.payment_method = {
+          title: pm.title || null,
+          card_type: pm.card?.card_type || null,
+          last4: pm.card?.last4 || null,
+        };
+      } catch {
+        // Payment method may have been removed at YooKassa; leave details out
+      }
+    }
     subscription = subData;
   } catch {
     // table may not exist

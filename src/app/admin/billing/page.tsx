@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2 } from "lucide-react";
+import { Check, CreditCard, Loader2 } from "lucide-react";
 import { pluralize } from "@/lib/labels";
 
 interface PlanInfo {
@@ -24,6 +24,12 @@ interface BillingStatus {
     status: string;
     current_period_end: string;
     cancel_at_period_end: boolean;
+    yookassa_payment_method_id: string | null;
+    payment_method?: {
+      title?: string | null;
+      card_type?: string | null;
+      last4?: string | null;
+    } | null;
   } | null;
   usage: { plan: string; used: number; limit: number; remaining: number } | null;
   available_plans: PlanInfo[];
@@ -53,6 +59,9 @@ function BillingContent() {
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [unbinding, setUnbinding] = useState(false);
+  const [unbindError, setUnbindError] = useState("");
+  const [confirmUnbind, setConfirmUnbind] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("status") === "checkout") {
@@ -86,6 +95,28 @@ function BillingContent() {
       setError("Ошибка соединения");
     } finally {
       setCheckingOut(null);
+    }
+  };
+
+  const handleUnbind = async () => {
+    setUnbinding(true);
+    setUnbindError("");
+    try {
+      const res = await fetch("/api/billing/payment-method/unbind", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUnbindError(data.error || "Не удалось отвязать карту");
+        return;
+      }
+      const statusRes = await fetch("/api/billing/status");
+      if (statusRes.ok) setStatus(await statusRes.json());
+      setConfirmUnbind(false);
+    } catch {
+      setUnbindError("Ошибка соединения");
+    } finally {
+      setUnbinding(false);
     }
   };
 
@@ -139,6 +170,64 @@ function BillingContent() {
                 <span className="font-medium">
                   {status.usage.used} / {status.usage.limit}
                 </span>
+              </div>
+            )}
+            {status.subscription.yookassa_payment_method_id && (
+              <div className="p-3 bg-gray-50 rounded-lg mt-4">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-gray-500" />
+                  Привязана карта
+                </p>
+                {status.subscription.payment_method?.title && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    {status.subscription.payment_method.title}
+                    {status.subscription.payment_method.last4 &&
+                      ` •••• ${status.subscription.payment_method.last4}`}
+                  </p>
+                )}
+                {!confirmUnbind ? (
+                  <Button
+                    variant="outline"
+                    className="mt-3"
+                    disabled={unbinding}
+                    onClick={() => setConfirmUnbind(true)}
+                  >
+                    Отвязать карту
+                  </Button>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm text-red-600">
+                      После отвязки автопродление подписки будет остановлено.
+                      Вы сможете снова оплатить тариф вручную.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="destructive"
+                        disabled={unbinding}
+                        onClick={handleUnbind}
+                      >
+                        {unbinding ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Отвязываем...
+                          </>
+                        ) : (
+                          "Подтвердить отвязку"
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={unbinding}
+                        onClick={() => setConfirmUnbind(false)}
+                      >
+                        Отмена
+                      </Button>
+                    </div>
+                    {unbindError && (
+                      <p className="text-sm text-red-500">{unbindError}</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             {!status.subscription.cancel_at_period_end && (

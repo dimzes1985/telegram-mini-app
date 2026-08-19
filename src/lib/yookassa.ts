@@ -109,6 +109,36 @@ export async function cancelYookassaPayment(
   return data as YookassaPayment;
 }
 
+export interface YookassaPaymentMethod {
+  id: string;
+  type?: string;
+  saved?: boolean;
+  title?: string;
+  card?: { first6?: string; last4?: string; card_type?: string };
+}
+
+export async function getYookassaPaymentMethod(
+  paymentMethodId: string
+): Promise<YookassaPaymentMethod> {
+  const response = await fetch(
+    `${YOOKASSA_API}/payment_methods/${paymentMethodId}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: authHeader(),
+      },
+    }
+  );
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(
+      `ЮKassa error ${response.status}: ${data?.description || JSON.stringify(data)}`
+    );
+  }
+  return data as YookassaPaymentMethod;
+}
+
 export function isYookassaConfigured(): boolean {
   return Boolean(
     process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_SECRET_KEY
