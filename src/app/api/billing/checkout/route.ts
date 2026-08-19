@@ -35,20 +35,28 @@ export async function POST(req: Request) {
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").trim();
   const returnUrl = `${baseUrl}/admin/billing?status=checkout`;
 
-  const payment = await createYookassaPayment({
-    amount: planConfig.priceMonthlyRub,
-    description: `Подписка ${planConfig.name} (${user.email || "business"})`,
-    returnUrl,
-    savePaymentMethod: true,
-    metadata: {
-      user_id: user.id,
-      plan,
-      type: "subscription_first",
-    },
-  });
+  try {
+    const payment = await createYookassaPayment({
+      amount: planConfig.priceMonthlyRub,
+      description: `Подписка ${planConfig.name} (${user.email || "business"})`,
+      returnUrl,
+      savePaymentMethod: true,
+      metadata: {
+        user_id: user.id,
+        plan,
+        type: "subscription_first",
+      },
+    });
 
-  return NextResponse.json({
-    payment_id: payment.id,
-    confirmation_url: payment.confirmation?.confirmation_url,
-  });
+    return NextResponse.json({
+      payment_id: payment.id,
+      confirmation_url: payment.confirmation?.confirmation_url,
+    });
+  } catch (e) {
+    console.error("YooKassa checkout failed:", e);
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Ошибка создания платежа" },
+      { status: 502 }
+    );
+  }
 }
