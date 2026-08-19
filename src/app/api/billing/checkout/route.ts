@@ -35,18 +35,46 @@ export async function POST(req: Request) {
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").trim();
   const returnUrl = `${baseUrl}/admin/billing?status=checkout`;
 
+  const isRecurringNotAllowed = (e: unknown) =>
+    e instanceof Error &&
+    e.message.includes("403") &&
+    /recurring/i.test(e.message);
+
   try {
-    const payment = await createYookassaPayment({
-      amount: planConfig.priceMonthlyRub,
-      description: `Подписка ${planConfig.name} (${user.email || "business"})`,
-      returnUrl,
-      savePaymentMethod: true,
-      metadata: {
-        user_id: user.id,
-        plan,
-        type: "subscription_first",
-      },
-    });
+    let payment;
+    try {
+      // Try to create a subscription payment with the payment method saved for
+      // future recurring charges (requires autopayments enabled in YooKassa).
+      payment = await createYookassaPayment({
+        amount: planConfig.priceMonthlyRub,
+        description: `Подписка ${planConfig.name} (${user.email || "business"})`,
+        returnUrl,
+        savePaymentMethod: true,
+        metadata: {
+          user_id: user.id,
+          plan,
+          type: "subscription_first",
+        },
+      });
+    } catch (e) {
+      // If the store can't do recurring payments yet, fall back to a regular
+      // one-time payment so the first purchase still works.
+      if (isRecurringNotAllowed(e)) {
+        payment = await createYookassaPayment({
+          amount: planConfig.priceMonthlyRub,
+          description: `Подписка ${planConfig.name} (${user.email || "business"})`,
+          returnUrl,
+          savePaymentMethod: false,
+          metadata: {
+            user_id: user.id,
+            plan,
+            type: "subscription_first",
+          },
+        });
+      } else {
+        throw e;
+      }
+    }
 
     return NextResponse.json({
       payment_id: payment.id,

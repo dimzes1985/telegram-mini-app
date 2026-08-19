@@ -38,7 +38,14 @@ export async function POST(req: Request) {
   const paymentId = notification.object?.id;
 
   if (notification.event === "payment.succeeded") {
-    const paymentMethodId = notification.object?.payment_method?.id;
+    // Only use the payment method for future recurring charges if YooKassa
+    // actually saved it (save_payment_method). For one-time fallback payments
+    // the method must be ignored, otherwise the renewal cron would try to
+    // charge an unsaved method.
+    const savedMethod = notification.object?.payment_method?.saved === true;
+    const paymentMethodId = savedMethod
+      ? notification.object?.payment_method?.id
+      : null;
 
     // Record the payment
     await admin.from("payments").upsert(
