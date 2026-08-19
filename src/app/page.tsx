@@ -19,6 +19,8 @@ import {
   ChevronDown,
   Star,
   Sparkles,
+  Send,
+  Loader2,
 } from "lucide-react";
 
 // ---- Pricing data (mirrors src/lib/plans.ts) ----
@@ -204,6 +206,35 @@ function Reveal({
 export default function Home() {
   const [yearly, setYearly] = useState(true);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [contact, setContact] = useState({ name: "", contact: "", message: "" });
+  const [contactStatus, setContactStatus] = useState<
+    "idle" | "sending" | "sent" | "error"
+  >("idle");
+  const [contactError, setContactError] = useState("");
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setContactStatus("sending");
+    setContactError("");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contact),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setContactStatus("error");
+        setContactError(data.error || "Не удалось отправить сообщение");
+        return;
+      }
+      setContactStatus("sent");
+      setContact({ name: "", contact: "", message: "" });
+    } catch {
+      setContactStatus("error");
+      setContactError("Ошибка соединения");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -224,6 +255,7 @@ export default function Home() {
             <a href="#how" className="hover:text-gray-900">Как это работает</a>
             <a href="#cases" className="hover:text-gray-900">Кому подходит</a>
             <a href="#pricing" className="hover:text-gray-900">Тарифы</a>
+            <a href="#contact" className="hover:text-gray-900">Контакты</a>
           </nav>
           <div className="flex items-center gap-3">
             <Link href="/login" className="hidden text-sm text-gray-600 hover:text-gray-900 sm:block">
@@ -662,6 +694,83 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ============ CONTACT ============ */}
+      <section id="contact" className="mx-auto max-w-3xl px-4 pb-20">
+        <Reveal className="text-center">
+          <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
+            Связаться с нами
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-gray-600">
+            Остались вопросы или хотите обсудить подключение? Напишите нам — мы
+            ответим в мессенджере в течение рабочего дня.
+          </p>
+        </Reveal>
+        <Reveal delay={120}>
+          <div className="mt-10 rounded-2xl border border-gray-200 bg-gray-50/50 p-6 shadow-sm sm:p-8">
+            {contactStatus === "sent" ? (
+              <div className="py-8 text-center">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600">
+                  <Check className="h-6 w-6" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Сообщение отправлено
+                </h3>
+                <p className="mt-2 text-sm text-gray-600">
+                  Спасибо! Мы свяжемся с вами в ближайшее время.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleContactSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <input
+                    required
+                    value={contact.name}
+                    onChange={(e) => setContact({ ...contact, name: e.target.value })}
+                    placeholder="Ваше имя"
+                    className="h-11 rounded-lg border border-gray-300 bg-white px-4 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  />
+                  <input
+                    value={contact.contact}
+                    onChange={(e) => setContact({ ...contact, contact: e.target.value })}
+                    placeholder="Telegram, MAX или телефон"
+                    className="h-11 rounded-lg border border-gray-300 bg-white px-4 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+                <textarea
+                  required
+                  rows={5}
+                  value={contact.message}
+                  onChange={(e) => setContact({ ...contact, message: e.target.value })}
+                  placeholder="Ваш вопрос или сообщение"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+                {contactStatus === "error" && contactError && (
+                  <p className="text-sm text-red-600">{contactError}</p>
+                )}
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full"
+                  disabled={contactStatus === "sending"}
+                >
+                  {contactStatus === "sending" ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Отправляем...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Отправить сообщение
+                    </>
+                  )}
+                </Button>
+              </form>
+            )}
+          </div>
+        </Reveal>
+      </section>
+
       {/* ============ FINAL CTA ============ */}
       <section className="mx-auto max-w-6xl px-4 pb-20">
         <Reveal>
@@ -701,6 +810,7 @@ export default function Home() {
           <nav className="flex gap-6 text-sm text-gray-500">
             <a href="#features" className="hover:text-gray-900">Возможности</a>
             <a href="#pricing" className="hover:text-gray-900">Тарифы</a>
+            <a href="#contact" className="hover:text-gray-900">Контакты</a>
             <Link href="/login" className="hover:text-gray-900">Войти</Link>
           </nav>
         </div>
