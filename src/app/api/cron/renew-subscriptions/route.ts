@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PLANS, type Plan } from "@/lib/plans";
 import { createYookassaPayment, isYookassaConfigured } from "@/lib/yookassa";
+import { loadOwnerNotifyTargets, notifyOwner } from "@/lib/notify-owner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
   const { data: subs, error } = await admin
     .from("subscriptions")
     .select("*")
-    .eq("status", "active")
+    .in("status", ["active", "past_due"])
     .eq("cancel_at_period_end", false)
     .lte("current_period_end", now);
 
@@ -51,7 +52,24 @@ export async function POST(req: Request) {
 
   for (const sub of subs || []) {
     if (!sub.yookassa_payment_method_id) {
-      results.push({ user_id: sub.user_id, status: "skipped", detail: "no saved payment method" });
+      // The period has ended but there is no saved payment method, so the
+      // subscription cannot renew. Mark it past_due (instead of silently
+      // skipping) and alert the owner, otherwise it stays active forever
+      // without charging.
+      await admin
+        .from("subscriptions")
+        .update({ status: "past_due", updated_at: new Date().toISOString() })
+        .eq("user_id", sub.user_id);
+      const targets = await loadOwnerNotifyTargets(admin, sub.user_id);
+      notifyOwner(
+        targets,
+        `Внимание: у подписки пользователя ${sub.user_id} нет сохранённого метода оплаты — автопродление невозможно. Подписка переведена в статус past_due.`
+      );
+      results.push({
+        user_id: sub.user_id,
+        status: "past_due",
+        detail: "no saved payment method",
+      });
       continue;
     }
 
@@ -78,6 +96,17 @@ export async function POST(req: Request) {
       });
       results.push({ user_id: sub.user_id, status: "renewal_initiated" });
     } catch (e) {
+      // The recurring charge failed (e.g. the saved payment method is no longer
+      // valid). Flag the subscription so it stops being treated as active.
+      await admin
+        .from("subscriptions")
+        .update({ status: "past_due", updated_at: new Date().toISOString() })
+        .eq("user_id", sub.user_id);
+      const targets = await loadOwnerNotifyTargets(admin, sub.user_id);
+      notifyOwner(
+        targets,
+        `Внимание: автопродление тарифа пользователя ${sub.user_id} завершилось ошибкой. Подписка переведена в статус past_due.`
+      );
       results.push({
         user_id: sub.user_id,
         status: "error",

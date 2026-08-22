@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Save, Bot, ExternalLink, CheckCircle } from "lucide-react";
+import { Save, Bot, ExternalLink, CheckCircle, Bell } from "lucide-react";
 
 interface WorkingHoursDay {
   start: string;
@@ -53,6 +53,8 @@ export default function SettingsPage() {
   const [maxBotUsername, setMaxBotUsername] = useState("");
   const [maxBotTokenSet, setMaxBotTokenSet] = useState(false);
   const [maxBotWebhookSet, setMaxBotWebhookSet] = useState(false);
+  const [telegramNotifyChatId, setTelegramNotifyChatId] = useState("");
+  const [maxNotifyUserId, setMaxNotifyUserId] = useState("");
   const [businessId, setBusinessId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -83,6 +85,8 @@ export default function SettingsPage() {
         setMaxBotTokenSet(data.max_bot_token_set || false);
         setMaxBotUsername(data.max_bot_username || "");
         setMaxBotWebhookSet(data.max_bot_webhook_set || false);
+        setTelegramNotifyChatId(data.telegram_notify_chat_id || "");
+        setMaxNotifyUserId(data.max_notify_user_id || "");
         setPlan(data.plan || "free");
         setAiUsage(data.ai_usage || null);
         setLoading(false);
@@ -122,6 +126,8 @@ export default function SettingsPage() {
       business_email: businessEmail,
       system_prompt: systemPrompt,
       working_hours: workingHours,
+      telegram_notify_chat_id: telegramNotifyChatId || null,
+      max_notify_user_id: maxNotifyUserId || null,
     };
 
     // Only include bot_token if user entered a new one
@@ -427,6 +433,55 @@ export default function SettingsPage() {
                 Ваш MAX-бот готов! Клиенты могут общаться с ним в MAX Messenger.
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              Уведомления о записях
+            </CardTitle>
+            <CardDescription>
+              Владелец получит сообщение о каждой новой записи. Укажите, куда
+              доставлять уведомления.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="telegramNotifyChatId">Telegram chat ID</Label>
+              <Input
+                id="telegramNotifyChatId"
+                value={telegramNotifyChatId}
+                onChange={(e) => setTelegramNotifyChatId(e.target.value)}
+                placeholder="Например, 123456789"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Отправьте сообщение боту{" "}
+                <a
+                  href="https://t.me/userinfobot"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:underline"
+                >
+                  @userinfobot
+                </a>{" "}
+                в Telegram, чтобы узнать свой ID. Уведомления придут от вашего
+                Telegram-бота, поэтому сначала напишите ему (команда /start).
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="maxNotifyUserId">MAX user ID</Label>
+              <Input
+                id="maxNotifyUserId"
+                value={maxNotifyUserId}
+                onChange={(e) => setMaxNotifyUserId(e.target.value)}
+                placeholder="Например, 30876538"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Ваш ID в MAX Messenger. Уведомления придут от вашего MAX-бота.
+              </p>
+            </div>
           </CardContent>
         </Card>
 

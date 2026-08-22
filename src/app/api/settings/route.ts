@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAiUsage } from "@/lib/ai-usage";
 import { getMaxBotInfo } from "@/lib/max-bot";
+import { parseJsonBody, invalidJsonResponse } from "@/lib/http";
 
 // GET user settings
 export async function GET() {
@@ -65,12 +66,31 @@ export async function GET() {
     // Columns might not exist yet
   }
 
+  // Try to get notification columns (might not exist yet)
+  let notifyData: { telegram_notify_chat_id: string | null; max_notify_user_id: string | null } = { telegram_notify_chat_id: null, max_notify_user_id: null };
+  try {
+    const { data: notifyResult } = await supabase
+      .from("users")
+      .select("telegram_notify_chat_id, max_notify_user_id")
+      .eq("id", user.id)
+      .single();
+    if (notifyResult) {
+      notifyData = {
+        telegram_notify_chat_id: notifyResult.telegram_notify_chat_id,
+        max_notify_user_id: notifyResult.max_notify_user_id,
+      };
+    }
+  } catch {
+    // Columns might not exist yet
+  }
+
   // Mask bot token for security
   const maskedData: Record<string, unknown> = {
     id: user.id,
     ...data,
     ...botData,
     ...maxBotData,
+    ...notifyData,
     bot_token: botData.bot_token ? "••••••••" + botData.bot_token.slice(-8) : null,
     bot_token_set: !!botData.bot_token,
     max_bot_token: maxBotData.max_bot_token ? "••••••••" + maxBotData.max_bot_token.slice(-8) : null,
@@ -99,8 +119,25 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { business_name, business_description, business_address, business_phone, business_email, system_prompt, working_hours, bot_token, bot_username, max_bot_token, max_bot_username } = body;
+  const body = await parseJsonBody(req);
+  if (body === undefined) return invalidJsonResponse();
+  const raw = body as Record<string, unknown>;
+  const {
+    business_name,
+    business_description,
+    business_address,
+    business_phone,
+    business_email,
+    system_prompt,
+    working_hours,
+    bot_username,
+    max_bot_username,
+    telegram_notify_chat_id,
+    max_notify_user_id,
+  } = raw;
+
+  const bot_token = typeof raw.bot_token === "string" ? raw.bot_token : undefined;
+  const max_bot_token = typeof raw.max_bot_token === "string" ? raw.max_bot_token : undefined;
 
   const updateData: Record<string, unknown> = {};
   if (business_name !== undefined) updateData.business_name = business_name;
@@ -110,6 +147,8 @@ export async function PUT(req: Request) {
   if (business_email !== undefined) updateData.business_email = business_email;
   if (system_prompt !== undefined) updateData.system_prompt = system_prompt;
   if (working_hours !== undefined) updateData.working_hours = working_hours;
+  if (telegram_notify_chat_id !== undefined) updateData.telegram_notify_chat_id = telegram_notify_chat_id;
+  if (max_notify_user_id !== undefined) updateData.max_notify_user_id = max_notify_user_id;
 
   // Handle bot token - only update if it's not the masked value
   if (bot_token !== undefined && bot_token && !bot_token.startsWith("••••")) {

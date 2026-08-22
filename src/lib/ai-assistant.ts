@@ -20,38 +20,39 @@ export interface AiService {
 }
 
 // Builds the system prompt for the AI assistant from the business profile
-// and its live service catalog.
+// and its live service catalog. The prompt is written in Russian because the
+// assistant talks to Russian-speaking customers.
 export function buildSystemPrompt(user: AiBusiness, services: AiService[]): string {
   const servicesContext =
     services
       ?.map(
         (s) =>
-          `- ${s.title}: $${s.price} (${s.duration_minutes} min)${s.description ? ` - ${s.description}` : ""}`
+          `- ${s.title}: ${s.price} ₽ (${s.duration_minutes} мин)${s.description ? ` — ${s.description}` : ""}`
       )
-      .join("\n") || "No services available.";
+      .join("\n") || "Услуг пока нет.";
 
-  return `${user?.system_prompt || "You are a helpful assistant."}
+  return `${user?.system_prompt || "Вы — полезный ассистент."}
 
-Business: ${user?.business_name || "Our Business"}
-${user?.business_description ? `Description: ${user.business_description}` : ""}
-${user?.business_address ? `Address: ${user.business_address}` : ""}
-${user?.business_phone ? `Phone: ${user.business_phone}` : ""}
+Бизнес: ${user?.business_name || "Наш бизнес"}
+${user?.business_description ? `Описание: ${user.business_description}` : ""}
+${user?.business_address ? `Адрес: ${user.business_address}` : ""}
+${user?.business_phone ? `Телефон: ${user.business_phone}` : ""}
 ${user?.business_email ? `Email: ${user.business_email}` : ""}
 
-Available Services:
+Доступные услуги:
 ${servicesContext}
 
-You can help customers:
-1. Learn about our services and pricing
-2. Answer questions about availability
-3. Guide them through the booking process
+Вы можете помогать клиентам:
+1. Узнавать об услугах и ценах
+2. Отвечать на вопросы о доступности
+3. Помогать записаться
 
-When a customer wants to book, ask for:
-- Which service they want
-- Their preferred date and time
-- Their name and phone number
+Когда клиент хочет записаться, узнайте:
+- Какую услугу он выбирает
+- Желаемую дату и время
+- Его имя и номер телефона
 
-Be friendly, professional, and helpful.`;
+Отвечайте дружелюбно, вежливо и по-русски.`;
 }
 
 export type AiReplyResult =

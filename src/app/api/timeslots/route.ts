@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { z } from "zod";
 
 interface WorkingHoursDay {
   start: string;
@@ -7,34 +8,44 @@ interface WorkingHoursDay {
   enabled: boolean;
 }
 
+const timeslotsQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date (expected YYYY-MM-DD)"),
+  service_id: z.string().min(1),
+  business_id: z.string().min(1),
+});
+
 // GET available time slots for a specific date and service
 export async function GET(req: Request) {
   const supabase = createAdminClient();
 
   const { searchParams } = new URL(req.url);
-  const date = searchParams.get("date");
-  const serviceId = searchParams.get("service_id");
-  const businessId = searchParams.get("business_id");
+  const parsed = timeslotsQuerySchema.safeParse({
+    date: searchParams.get("date"),
+    service_id: searchParams.get("service_id"),
+    business_id: searchParams.get("business_id"),
+  });
 
-  if (!date || !serviceId || !businessId) {
+  if (!parsed.success) {
     return NextResponse.json(
       { error: "Date, service_id, and business_id required" },
       { status: 400 }
     );
   }
 
+  const { date, service_id, business_id } = parsed.data;
+
   // Get service duration
   const { data: service } = await supabase
     .from("services")
     .select("duration_minutes, user_id")
-    .eq("id", serviceId)
+    .eq("id", service_id)
     .single();
 
   if (!service) {
     return NextResponse.json({ error: "Service not found" }, { status: 404 });
   }
 
-  if (service.user_id !== businessId) {
+  if (service.user_id !== business_id) {
     return NextResponse.json(
       { error: "Service does not belong to this business" },
       { status: 403 }
@@ -45,7 +56,7 @@ export async function GET(req: Request) {
   const { data: user } = await supabase
     .from("users")
     .select("working_hours")
-    .eq("id", businessId)
+    .eq("id", business_id)
     .single();
 
   // Get day of week from date (0 = Sunday, 1 = Monday, etc.)
@@ -72,7 +83,7 @@ export async function GET(req: Request) {
   const { data: existingBookings } = await supabase
     .from("bookings")
     .select("booking_time")
-    .eq("user_id", businessId)
+    .eq("user_id", business_id)
     .eq("booking_date", date)
     .neq("status", "cancelled");
 

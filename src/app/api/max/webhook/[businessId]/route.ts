@@ -206,7 +206,7 @@ export async function POST(
           // Free-form messages are answered by the AI assistant, mirroring the
           // Telegram webhook behaviour.
           pruneRateLimitBuckets();
-          const limit = rateLimit(`max:ai:${user.id}:${userId}`, {
+          const limit = await rateLimit(`max:ai:${user.id}:${userId}`, {
             windowMs: 60_000,
             max: 10,
           });

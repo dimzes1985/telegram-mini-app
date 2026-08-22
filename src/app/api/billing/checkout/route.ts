@@ -2,9 +2,19 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { PLANS, type Plan } from "@/lib/plans";
 import { createYookassaPayment, isYookassaConfigured } from "@/lib/yookassa";
+import { z } from "zod";
+import {
+  parseJsonBody,
+  invalidJsonResponse,
+  validationErrorResponse,
+} from "@/lib/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const checkoutSchema = z.object({
+  plan: z.enum(["pro", "business"]),
+});
 
 // POST /api/billing/checkout - create a payment for upgrading the plan
 export async function POST(req: Request) {
@@ -25,10 +35,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const { plan } = await req.json();
+  const body = await parseJsonBody(req);
+  if (body === undefined) return invalidJsonResponse();
+  const parsed = checkoutSchema.safeParse(body);
+  if (!parsed.success) return validationErrorResponse(parsed.error);
+
+  const { plan } = parsed.data;
   const planConfig = PLANS[plan as Plan];
 
-  if (!planConfig || plan === "free") {
+  if (!planConfig) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 

@@ -171,7 +171,7 @@ export async function POST(
 
   // Handle regular messages - answer with the AI assistant
   pruneRateLimitBuckets();
-  const limit = rateLimit(`tg:ai:${user.id}:${chatId}`, {
+  const limit = await rateLimit(`tg:ai:${user.id}:${chatId}`, {
     windowMs: 60_000,
     max: 10,
   });

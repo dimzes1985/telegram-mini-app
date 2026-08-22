@@ -16,7 +16,7 @@ CREATE TABLE users (
   business_address TEXT,
   business_phone TEXT,
   business_email TEXT,
-  system_prompt TEXT DEFAULT 'You are a helpful assistant for our business. You can help customers learn about our services, pricing, and book appointments.',
+  system_prompt TEXT DEFAULT 'Вы — полезный ассистент нашего бизнеса. Помогаете клиентам узнавать об услугах, ценах и записываться на приём.',
   working_hours JSONB DEFAULT '{
     "monday": {"start": "09:00", "end": "18:00", "enabled": true},
     "tuesday": {"start": "09:00", "end": "18:00", "enabled": true},
@@ -30,6 +30,9 @@ CREATE TABLE users (
   bot_username TEXT,
   bot_webhook_secret TEXT,
   bot_webhook_set BOOLEAN DEFAULT false,
+  -- Destination for new-booking notifications (owner's own IDs)
+  telegram_notify_chat_id TEXT,
+  max_notify_user_id TEXT,
   plan TEXT DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'business')),
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -89,6 +92,13 @@ CREATE INDEX idx_services_active ON services(active) WHERE active = true;
 CREATE INDEX idx_bookings_user_id ON bookings(user_id);
 CREATE INDEX idx_bookings_date ON bookings(booking_date);
 CREATE INDEX idx_bookings_status ON bookings(status);
+
+-- Prevent double-booking the same time slot. The API route checks for
+-- conflicts before inserting, but without this constraint two concurrent
+-- requests could both pass the check and occupy the same slot.
+CREATE UNIQUE INDEX idx_bookings_slot_unique
+  ON bookings (user_id, booking_date, booking_time)
+  WHERE status <> 'cancelled';
 
 -- ============================================
 -- AI usage metering (monthly message quota per business)

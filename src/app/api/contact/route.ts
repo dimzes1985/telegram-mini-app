@@ -2,9 +2,21 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendMaxMessage } from "@/lib/max-bot";
 import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
+import { z } from "zod";
+import {
+  parseJsonBody,
+  invalidJsonResponse,
+  validationErrorResponse,
+} from "@/lib/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const contactSchema = z.object({
+  name: z.string().trim().min(1, "Имя обязательно").max(200),
+  contact: z.string().trim().max(500).optional(),
+  message: z.string().trim().min(1, "Сообщение обязательно").max(2000),
+});
 
 // Where contact-form messages are delivered.
 // The owner's own MAX bot (configured in the admin panel) is used as the
@@ -23,7 +35,7 @@ export async function POST(req: Request) {
     req.headers.get("x-real-ip") ||
     "unknown";
 
-  const { allowed, retryAfterMs } = rateLimit(`contact:${ip}`, {
+  const { allowed, retryAfterMs } = await rateLimit(`contact:${ip}`, {
     windowMs: 60 * 60 * 1000,
     max: 5,
   });
@@ -34,23 +46,12 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { name?: string; contact?: string; message?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  }
+  const body = await parseJsonBody(req);
+  if (body === undefined) return invalidJsonResponse();
+  const parsed = contactSchema.safeParse(body);
+  if (!parsed.success) return validationErrorResponse(parsed.error);
 
-  const name = (body.name || "").trim().slice(0, 200);
-  const contact = (body.contact || "").trim().slice(0, 500);
-  const message = (body.message || "").trim().slice(0, 2000);
-
-  if (!name || !message) {
-    return NextResponse.json(
-      { error: "Имя и сообщение обязательны" },
-      { status: 400 }
-    );
-  }
+  const { name, contact, message } = parsed.data;
 
   const admin = createAdminClient();
   const { data: owner, error } = await admin

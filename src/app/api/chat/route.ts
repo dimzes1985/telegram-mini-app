@@ -66,7 +66,7 @@ export async function POST(req: Request) {
 
   // Rate limit per user + business to protect AI costs
   pruneRateLimitBuckets();
-  const limit = rateLimit(`chat:${businessId}:${messengerUserId}`, {
+  const limit = await rateLimit(`chat:${businessId}:${messengerUserId}`, {
     windowMs: 60_000,
     max: 20,
   });

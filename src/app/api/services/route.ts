@@ -1,6 +1,19 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getPlan, PLANS } from "@/lib/plans";
+import { z } from "zod";
+import {
+  parseJsonBody,
+  invalidJsonResponse,
+  validationErrorResponse,
+} from "@/lib/http";
+
+const createServiceSchema = z.object({
+  title: z.string().trim().min(1, "Название обязательно").max(200),
+  description: z.string().trim().max(2000).nullable().optional(),
+  price: z.number().finite().min(0, "Цена не может быть отрицательной").max(1_000_000),
+  duration_minutes: z.number().int().min(5).max(1440).default(30),
+});
 
 // GET all services for the logged-in user
 export async function GET() {
@@ -39,15 +52,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { title, description, price, duration_minutes } = body;
+  const body = await parseJsonBody(req);
+  if (body === undefined) return invalidJsonResponse();
+  const parsed = createServiceSchema.safeParse(body);
+  if (!parsed.success) return validationErrorResponse(parsed.error);
 
-  if (!title || !price) {
-    return NextResponse.json(
-      { error: "Title and price are required" },
-      { status: 400 }
-    );
-  }
+  const { title, description, price, duration_minutes } = parsed.data;
 
   // Enforce plan service limit
   const { data: userData } = await supabase

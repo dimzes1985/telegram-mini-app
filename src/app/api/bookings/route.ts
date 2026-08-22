@@ -4,9 +4,80 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyInitData } from "@/lib/telegram-auth";
 import { verifyMaxInitData } from "@/lib/max-auth";
 import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
+import { notifyOwner } from "@/lib/notify-owner";
+import { z } from "zod";
+import {
+  parseJsonBody,
+  invalidJsonResponse,
+  validationErrorResponse,
+  uuidString,
+  dateString,
+  timeString,
+} from "@/lib/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const createBookingSchema = z.object({
+  service_id: uuidString,
+  user_id: uuidString,
+  booking_date: dateString,
+  booking_time: timeString,
+  customer_name: z.string().trim().min(1, "Имя обязательно").max(200),
+  customer_phone: z.string().trim().max(50).nullable().optional(),
+  customer_notes: z.string().trim().max(1000).nullable().optional(),
+  initData: z.string().min(1, "initData required"),
+  platform: z.enum(["telegram", "max"]).default("telegram"),
+});
+
+const updateBookingSchema = z.object({
+  id: uuidString,
+  status: z.enum(["pending", "confirmed", "cancelled"]),
+});
+
+interface BookingNotificationInput {
+  business: {
+    bot_token?: string | null;
+    max_bot_token?: string | null;
+    telegram_notify_chat_id?: string | null;
+    max_notify_user_id?: string | null;
+  };
+  serviceTitle: string;
+  bookingDate: string;
+  bookingTime: string;
+  customerName: string;
+  customerPhone?: string | null;
+  customerNotes?: string | null;
+}
+
+// Builds the new-booking message and sends it to the owner's channels.
+// Non-blocking: a failed notification must not fail the booking.
+function notifyBookingOwner(input: BookingNotificationInput): void {
+  const {
+    business,
+    serviceTitle,
+    bookingDate,
+    bookingTime,
+    customerName,
+    customerPhone,
+    customerNotes,
+  } = input;
+
+  const lines = [
+    "🔔 Новая запись!",
+    "",
+    `🛠 Услуга: ${serviceTitle}`,
+    `📅 Дата: ${bookingDate}`,
+    `🕒 Время: ${bookingTime}`,
+    `👤 Клиент: ${customerName}`,
+    `📞 Телефон: ${customerPhone || "не указан"}`,
+  ];
+  if (customerNotes) {
+    lines.push(`📝 Комментарий: ${customerNotes}`);
+  }
+
+  notifyOwner(business, lines.join("\n"));
+}
 
 // GET all bookings for the logged-in user (admin view)
 export async function GET() {
@@ -38,7 +109,11 @@ export async function GET() {
 export async function POST(req: Request) {
   const supabase = createAdminClient();
 
-  const body = await req.json();
+  const body = await parseJsonBody(req);
+  if (body === undefined) return invalidJsonResponse();
+  const parsed = createBookingSchema.safeParse(body);
+  if (!parsed.success) return validationErrorResponse(parsed.error);
+
   const {
     service_id,
     user_id,
@@ -48,15 +123,8 @@ export async function POST(req: Request) {
     customer_phone,
     customer_notes,
     initData,
-    platform = "telegram",
-  } = body;
-
-  if (!service_id || !user_id || !booking_date || !booking_time || !customer_name) {
-    return NextResponse.json(
-      { error: "Missing required fields" },
-      { status: 400 }
-    );
-  }
+    platform,
+  } = parsed.data;
 
   if (!initData) {
     return NextResponse.json(
@@ -68,7 +136,7 @@ export async function POST(req: Request) {
   // Load the business bot token(s) to verify the caller
   const { data: business } = await supabase
     .from("users")
-    .select("bot_token, max_bot_token, working_hours")
+    .select("bot_token, max_bot_token, working_hours, telegram_notify_chat_id, max_notify_user_id")
     .eq("id", user_id)
     .single();
 
@@ -102,7 +170,7 @@ export async function POST(req: Request) {
 
   // Rate limit booking attempts per user + business
   pruneRateLimitBuckets();
-  const limit = rateLimit(`bookings:${user_id}:${messengerUserId}`, {
+  const limit = await rateLimit(`bookings:${user_id}:${messengerUserId}`, {
     windowMs: 60_000,
     max: 10,
   });
@@ -183,7 +251,28 @@ export async function POST(req: Request) {
     .single();
 
   if (error) {
+    // The unique index on (user_id, booking_date, booking_time) guards the
+    // race between the conflict check above and the insert.
+    if (error.code === "23505") {
+      return NextResponse.json(
+        { error: "This time slot is already booked" },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Notify the owner (non-blocking; a notification failure must not fail the booking)
+  if (data && business) {
+    notifyBookingOwner({
+      business,
+      serviceTitle: service.title,
+      bookingDate: booking_date,
+      bookingTime: booking_time,
+      customerName: customer_name,
+      customerPhone: customer_phone,
+      customerNotes: customer_notes,
+    });
   }
 
   return NextResponse.json(data, { status: 201 });
@@ -201,15 +290,12 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { id, status } = body;
+  const body = await parseJsonBody(req);
+  if (body === undefined) return invalidJsonResponse();
+  const parsed = updateBookingSchema.safeParse(body);
+  if (!parsed.success) return validationErrorResponse(parsed.error);
 
-  if (!id || !status) {
-    return NextResponse.json(
-      { error: "Booking ID and status required" },
-      { status: 400 }
-    );
-  }
+  const { id, status } = parsed.data;
 
   const { data, error } = await supabase
     .from("bookings")
