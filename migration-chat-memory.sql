@@ -19,8 +19,17 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation
 
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "Users manage own chat_messages" ON chat_messages
-  FOR ALL USING (auth.uid() = user_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy
+    WHERE polname = 'Users manage own chat_messages'
+      AND polrelid = 'chat_messages'::regclass
+  ) THEN
+    CREATE POLICY "Users manage own chat_messages" ON chat_messages
+      FOR ALL USING (auth.uid() = user_id);
+  END IF;
+END $$;
 
 -- 2. Set the library system prompt for the owner's business.
 --    (Greeting contradiction fixed: greeting is only allowed in the FIRST
