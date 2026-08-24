@@ -16,7 +16,14 @@ CREATE TABLE users (
   business_address TEXT,
   business_phone TEXT,
   business_email TEXT,
-  system_prompt TEXT DEFAULT 'Вы — полезный ассистент нашего бизнеса. Помогаете клиентам узнавать об услугах, ценах и записываться на приём.',
+  system_prompt TEXT DEFAULT 'Ты — вежливый и компетентный библиотекарь-консультант библиотеки. Общайся доброжелательно, на «Вы», простым языком, по-русски.
+
+ПРАВИЛА ПРИВЕТСТВИЙ:
+- Приветствуй пользователя ТОЛЬКО в самом первом ответе нового диалога.
+- Если пользователь задал следующий вопрос в рамках той же беседы — НЕ повторяй приветствие, сразу переходи к ответу.
+- Исключение: если пользователь сам написал «Здравствуйте» или начал разговор после долгого перерыва — можно ответить взаимностью.
+
+Когда клиент хочет записаться на услугу, узнай: какую услугу он выбирает, желаемую дату и время, его имя и номер телефона. Когда данных достаточно, вызови инструмент create_booking и подтверди запись клиенту после его успешного выполнения.',
   working_hours JSONB DEFAULT '{
     "monday": {"start": "09:00", "end": "18:00", "enabled": true},
     "tuesday": {"start": "09:00", "end": "18:00", "enabled": true},
@@ -92,6 +99,25 @@ CREATE INDEX idx_services_active ON services(active) WHERE active = true;
 CREATE INDEX idx_bookings_user_id ON bookings(user_id);
 CREATE INDEX idx_bookings_date ON bookings(booking_date);
 CREATE INDEX idx_bookings_status ON bookings(status);
+
+-- ============================================
+-- AI conversation history (per messenger user)
+-- ============================================
+-- Stores recent AI chat messages per business + channel so the assistant can
+-- remember the dialog (avoid re-greeting, keep booking context like the
+-- chosen date/time). Only the last few messages per conversation are kept.
+CREATE TABLE chat_messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  channel TEXT NOT NULL CHECK (channel IN ('tg', 'max')),
+  channel_user_id TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_chat_messages_conversation
+  ON chat_messages (user_id, channel, channel_user_id, created_at);
 
 -- Prevent double-booking the same time slot. The API route checks for
 -- conflicts before inserting, but without this constraint two concurrent
@@ -180,6 +206,7 @@ ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_usage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 
 -- Users can only see/update their own profile
 CREATE POLICY "Users see own profile" ON users
@@ -203,6 +230,10 @@ CREATE POLICY "Users manage own subscription" ON subscriptions
 
 -- Users can manage their own payments
 CREATE POLICY "Users manage own payments" ON payments
+  FOR ALL USING (auth.uid() = user_id);
+
+-- Users can manage their own chat history (server uses admin client anyway)
+CREATE POLICY "Users manage own chat_messages" ON chat_messages
   FOR ALL USING (auth.uid() = user_id);
 
 -- Service role (server-side metering) can read/write all ai_usage rows.

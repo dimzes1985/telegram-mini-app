@@ -1,7 +1,15 @@
-import { streamText } from "ai";
+import { streamText, tool, isStepCount, zodSchema } from "ai";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAiUsage, incrementAiUsage } from "@/lib/ai-usage";
 import { getAiModel } from "@/lib/ai";
+import {
+  getConversationHistory,
+  appendConversationMessages,
+  type ConversationChannel,
+} from "@/lib/conversation";
+import { createBookingForBusiness } from "@/lib/create-booking";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 
 export interface AiBusiness {
   system_prompt?: string | null;
@@ -42,28 +50,58 @@ ${user?.business_email ? `Email: ${user.business_email}` : ""}
 Доступные услуги:
 ${servicesContext}
 
-Вы можете помогать клиентам:
-1. Узнавать об услугах и ценах
-2. Отвечать на вопросы о доступности
-3. Помогать записаться
+ВАЖНЫЕ ПРАВИЛА ПОВЕДЕНИЯ:
+1. Приветствие — ТОЛЬКО в самом первом сообщении диалога. Во всех последующих репликах этой же беседы НИКОГДА не начинай ответ с «Здравствуйте», «Добрый день» или подобных приветствий — сразу отвечай по существу. Это правило важнее любых примеров ниже.
+2. Если клиент хочет записаться на услугу, уточни у него: название услуги, желаемую дату (ГГГГ-ММ-ДД), время (ЧЧ:ММ) и имя. Когда все данные собраны — обязательно вызови инструмент create_booking.
+3. Подтверждай запись клиенту ТОЛЬКО после того, как инструмент create_booking вернул «ЗАПИСЬ СОЗДАНА». Если инструмент вернул «ОШИБКА» (время занято, библиотека закрыта и т.п.) — объясни причину клиенту и предложи другие варианты.`;
+}
 
-Когда клиент хочет записаться, узнайте:
-- Какую услугу он выбирает
-- Желаемую дату и время
-- Его имя и номер телефона
-
-Отвечайте дружелюбно, вежливо и по-русски.`;
+// The booking tool lets the assistant actually create a booking at the exact
+// date and time the customer asked for.
+export function makeBookingTool(supabase: SupabaseClient, businessId: string) {
+  return tool({
+    description:
+      "Записать клиента на услугу на конкретные дату и время. Вызывай, когда клиент назвал услугу, желаемую дату (ГГГГ-ММ-ДД), время (ЧЧ:ММ) и своё имя. Номер телефона передавай, только если клиент его сообщил.",
+    inputSchema: zodSchema(
+      z.object({
+        service_title: z.string().describe("Название услуги, которую выбрал клиент"),
+        booking_date: z.string().describe("Дата в формате ГГГГ-ММ-ДД"),
+        booking_time: z.string().describe("Время в формате ЧЧ:ММ"),
+        customer_name: z.string().describe("Имя клиента"),
+        customer_phone: z
+          .string()
+          .optional()
+          .describe("Номер телефона клиента (если клиент его сообщил)"),
+        customer_notes: z
+          .string()
+          .optional()
+          .describe("Комментарий клиента к записи"),
+      })
+    ),
+    execute: async (input) => {
+      const result = await createBookingForBusiness(supabase, businessId, input);
+      return result.ok
+        ? `ЗАПИСЬ СОЗДАНА: ${result.message}`
+        : `ОШИБКА: ${result.error}`;
+    },
+  });
 }
 
 export type AiReplyResult =
   | { ok: true; text: string }
   | { ok: false; reason: "not_found" | "quota" | "error"; message: string };
 
+// How many model turns a single reply may take (user turn + tool call + final
+// text). Default is 1, which would stop after the tool call without the
+// confirmation text.
+const MAX_REPLY_STEPS = 3;
+
 // Generates a complete (non-streaming) AI reply for a business.
 // Used by messenger bots that send the answer straight into the chat.
 export async function generateAiReply(
   businessId: string,
-  messages: Array<{ role: "user" | "assistant"; content: string }>
+  messages: Array<{ role: "user" | "assistant"; content: string }>,
+  conversation?: { channel: ConversationChannel; channelUserId: string }
 ): Promise<AiReplyResult> {
   const supabase = createAdminClient();
 
@@ -93,9 +131,39 @@ export async function generateAiReply(
 
   const system = buildSystemPrompt(user, services ?? []);
 
+  // Load previous dialog turns (if any) so the model knows this is a
+  // continuation and does not re-greet or lose the booking context.
+  let history: Array<{ role: "user" | "assistant"; content: string }> = [];
+  if (conversation) {
+    history = await getConversationHistory(
+      supabase,
+      businessId,
+      conversation.channel,
+      conversation.channelUserId
+    );
+  }
+
   try {
-    const result = streamText({ model: getAiModel(), system, messages });
+    const result = streamText({
+      model: getAiModel(),
+      system,
+      messages: [...history, ...messages],
+      tools: { create_booking: makeBookingTool(supabase, businessId) },
+      stopWhen: isStepCount(MAX_REPLY_STEPS),
+    });
     const text = await result.text;
+
+    // Persist this turn so the next message continues the same dialog.
+    if (conversation) {
+      await appendConversationMessages(
+        supabase,
+        businessId,
+        conversation.channel,
+        conversation.channelUserId,
+        [...messages, { role: "assistant", content: text }]
+      );
+    }
+
     // Count the assistant response toward the monthly quota
     await incrementAiUsage(supabase, businessId);
     return { ok: true, text };

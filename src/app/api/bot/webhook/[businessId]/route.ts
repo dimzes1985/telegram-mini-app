@@ -184,9 +184,11 @@ export async function POST(
     return NextResponse.json({ ok: true });
   }
 
-  const reply = await generateAiReply(user.id, [
-    { role: "user", content: text },
-  ]);
+  const reply = await generateAiReply(
+    user.id,
+    [{ role: "user", content: text }],
+    { channel: "tg", channelUserId: String(chatId) }
+  );
 
   if (!reply.ok) {
     if (reply.reason === "quota") {

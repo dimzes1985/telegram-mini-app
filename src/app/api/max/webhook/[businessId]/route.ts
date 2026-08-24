@@ -218,9 +218,11 @@ export async function POST(
             );
           }
 
-          const reply = await generateAiReply(user.id, [
-            { role: "user", content: text },
-          ]);
+          const reply = await generateAiReply(
+            user.id,
+            [{ role: "user", content: text }],
+            { channel: "max", channelUserId: String(userId) }
+          );
 
           const bookButtons: ReturnType<typeof maxOpenAppButton>[][] = [];
           if (botPublicName) {

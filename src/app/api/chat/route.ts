@@ -1,14 +1,19 @@
-import { convertToModelMessages, streamText } from "ai";
+import { convertToModelMessages, isStepCount, streamText } from "ai";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyInitData } from "@/lib/telegram-auth";
 import { verifyMaxInitData } from "@/lib/max-auth";
 import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 import { getAiUsage, incrementAiUsage } from "@/lib/ai-usage";
 import { getAiModel } from "@/lib/ai";
-import { buildSystemPrompt } from "@/lib/ai-assistant";
+import { buildSystemPrompt, makeBookingTool } from "@/lib/ai-assistant";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// How many model turns a single reply may take (user turn + tool call + final
+// text). Default is 1, which would stop after the tool call without the
+// confirmation text.
+const MAX_REPLY_STEPS = 3;
 
 function jsonError(message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
@@ -103,6 +108,8 @@ export async function POST(req: Request) {
     model: getAiModel(),
     system: systemPrompt,
     messages: modelMessages,
+    tools: { create_booking: makeBookingTool(supabase, businessId) },
+    stopWhen: isStepCount(MAX_REPLY_STEPS),
     onFinish: async () => {
       // Count the assistant response toward the monthly quota
       await incrementAiUsage(supabase, businessId);
