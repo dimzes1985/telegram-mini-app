@@ -27,6 +27,33 @@ export interface AiService {
   duration_minutes: number;
 }
 
+// Current date/time in the business timezone (Russia / Moscow). The model has
+// no built-in clock, so without this it cannot translate "завтра"/"послезавтра"
+// into a correct date and ends up offering dates that are already in the past.
+const BUSINESS_TIMEZONE = "Europe/Moscow";
+
+function currentDateContext(): string {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: BUSINESS_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const weekday = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: BUSINESS_TIMEZONE,
+    weekday: "long",
+  }).format(now);
+  const time = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: BUSINESS_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(now);
+  return `Сегодня: ${get("year")}-${get("month")}-${get("day")} (${weekday}). Текущее время: ${time}.`;
+}
+
 // Builds the system prompt for the AI assistant from the business profile
 // and its live service catalog. The prompt is written in Russian because the
 // assistant talks to Russian-speaking customers.
@@ -41,6 +68,8 @@ export function buildSystemPrompt(user: AiBusiness, services: AiService[]): stri
 
   return `${user?.system_prompt || "Вы — полезный ассистент."}
 
+${currentDateContext()}
+
 Бизнес: ${user?.business_name || "Наш бизнес"}
 ${user?.business_description ? `Описание: ${user.business_description}` : ""}
 ${user?.business_address ? `Адрес: ${user.business_address}` : ""}
@@ -53,7 +82,8 @@ ${servicesContext}
 ВАЖНЫЕ ПРАВИЛА ПОВЕДЕНИЯ:
 1. Приветствие — ТОЛЬКО в самом первом сообщении диалога. Во всех последующих репликах этой же беседы НИКОГДА не начинай ответ с «Здравствуйте», «Добрый день» или подобных приветствий — сразу отвечай по существу. Это правило важнее любых примеров ниже.
 2. Если клиент хочет записаться на услугу, уточни у него: название услуги, желаемую дату (ГГГГ-ММ-ДД), время (ЧЧ:ММ) и имя. Когда все данные собраны — обязательно вызови инструмент create_booking.
-3. Подтверждай запись клиенту ТОЛЬКО после того, как инструмент create_booking вернул «ЗАПИСЬ СОЗДАНА». Если инструмент вернул «ОШИБКА» (время занято, библиотека закрыта и т.п.) — объясни причину клиенту и предложи другие варианты.`;
+3. Когда клиент говорит «завтра», «послезавтра», «в понедельник» и т.п., рассчитывай дату строго от сегодняшней даты, приведённой выше. Сегодняшняя дата и текущее время — всегда в контексте выше.
+4. Подтверждай запись клиенту ТОЛЬКО после того, как инструмент create_booking вернул «ЗАПИСЬ СОЗДАНА». Если инструмент вернул «ОШИБКА» (время занято, библиотека закрыта и т.п.) — объясни причину клиенту и предложи другие варианты.`;
 }
 
 // The booking tool lets the assistant actually create a booking at the exact
