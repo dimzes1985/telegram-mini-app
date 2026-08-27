@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle } from "lucide-react";
 import { bookingStatusLabel } from "@/lib/labels";
+import { bookingEndTime } from "@/lib/slot";
 import { Booking } from "@/types";
 
 const FILTERS = [
@@ -88,6 +89,9 @@ export function BookingsListView() {
                     </p>
                     <p className="text-sm text-gray-500">
                       {booking.booking_date} в {booking.booking_time}
+                      {booking.service?.duration_minutes
+                        ? `–${bookingEndTime(booking.booking_time, booking.service.duration_minutes)}`
+                        : ""}
                     </p>
                     {booking.customer_phone && (
                       <p className="text-sm text-gray-500">

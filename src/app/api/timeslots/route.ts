@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  findOverlappingSlot,
+  minutesToTime,
+  toBookedSlots,
+} from "@/lib/slot";
 import { z } from "zod";
 
 interface WorkingHoursDay {
@@ -52,6 +57,8 @@ export async function GET(req: Request) {
     );
   }
 
+  const durationMinutes = service.duration_minutes ?? 30;
+
   // Get business working hours
   const { data: user } = await supabase
     .from("users")
@@ -79,25 +86,29 @@ export async function GET(req: Request) {
   const startMinutes = startHour * 60 + startMin;
   const endMinutes = endHour * 60 + endMin;
 
-  // Get existing bookings for this date
+  // Get existing bookings for this date, with each service's duration so we
+  // can tell whether a proposed slot overlaps an already booked interval.
   const { data: existingBookings } = await supabase
     .from("bookings")
-    .select("booking_time")
+    .select("booking_time, service:services!inner(duration_minutes)")
     .eq("user_id", business_id)
     .eq("booking_date", date)
     .neq("status", "cancelled");
 
-  const bookedTimes = new Set(
-    existingBookings?.map((b) => b.booking_time.substring(0, 5)) || []
-  );
+  const bookedSlots = toBookedSlots(existingBookings);
 
-  // Generate time slots based on working hours
+  // Generate time slots within working hours. The grid steps by the service
+  // duration so a slot's interval never overlaps the next slot of the same
+  // service, and every slot fits entirely inside the work day.
   const slots = [];
   const isToday = dateObj.toDateString() === new Date().toDateString();
-  for (let minutes = startMinutes; minutes < endMinutes; minutes += 30) {
-    const hour = Math.floor(minutes / 60);
-    const min = minutes % 60;
-    const time = `${hour.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
+  const step = Math.max(15, durationMinutes);
+  for (
+    let minutes = startMinutes;
+    minutes + durationMinutes <= endMinutes;
+    minutes += step
+  ) {
+    const time = minutesToTime(minutes);
     if (isToday) {
       const now = new Date();
       const nowMinutes = now.getHours() * 60 + now.getMinutes();
@@ -107,7 +118,7 @@ export async function GET(req: Request) {
     }
     slots.push({
       time,
-      available: !bookedTimes.has(time),
+      available: !findOverlappingSlot(bookedSlots, time, durationMinutes),
     });
   }
 

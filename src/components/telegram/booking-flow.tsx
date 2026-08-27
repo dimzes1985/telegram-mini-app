@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { useMessenger } from "@/lib/messenger";
+import { bookingEndTime } from "@/lib/slot";
 import { ArrowLeft, Check } from "lucide-react";
 import { Service, TimeSlot } from "@/types";
 import { format, startOfDay } from "date-fns";
@@ -109,6 +110,11 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
     const hours = workingHours[dayName];
     return !!hours && hours.enabled;
   };
+
+  const selectedEndTime =
+    selectedService && selectedTime
+      ? bookingEndTime(selectedTime, selectedService.duration_minutes)
+      : null;
 
   const handleBooking = async () => {
     try {
@@ -289,7 +295,10 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Время</span>
-                <span className="font-medium">{selectedTime}</span>
+                <span className="font-medium">
+                  {selectedTime}
+                  {selectedEndTime ? `–${selectedEndTime}` : ""}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Цена</span>
@@ -363,7 +372,10 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Время</span>
-                <span className="font-medium">{selectedTime}</span>
+                <span className="font-medium">
+                  {selectedTime}
+                  {selectedEndTime ? `–${selectedEndTime}` : ""}
+                </span>
               </div>
             </div>
           </CardContent>

@@ -5,6 +5,12 @@ import { verifyInitData } from "@/lib/telegram-auth";
 import { verifyMaxInitData } from "@/lib/max-auth";
 import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 import { notifyOwner } from "@/lib/notify-owner";
+import {
+  bookingEndTime,
+  findOverlappingSlot,
+  timeToMinutes,
+  toBookedSlots,
+} from "@/lib/slot";
 import { z } from "zod";
 import {
   parseJsonBody,
@@ -197,23 +203,18 @@ export async function POST(req: Request) {
     );
   }
 
-  // Check for conflicting bookings
-  const { data: existingBookings } = await supabase
-    .from("bookings")
-    .select("id")
-    .eq("user_id", user_id)
-    .eq("booking_date", booking_date)
-    .eq("booking_time", booking_time)
-    .neq("status", "cancelled");
-
-  if (existingBookings && existingBookings.length > 0) {
+  const durationMinutes = service.duration_minutes ?? 30;
+  const startMinutes = timeToMinutes(booking_time);
+  if (startMinutes === null) {
     return NextResponse.json(
-      { error: "This time slot is already booked" },
-      { status: 409 }
+      { error: "Invalid time format" },
+      { status: 400 }
     );
   }
+  const endTime = bookingEndTime(booking_time, durationMinutes);
 
-  // Validate the requested time is within the business working hours
+  // Validate the requested time fits within the business working hours,
+  // including the full service duration (start and end inside the work day).
   if (business?.working_hours) {
     const dateObj = new Date(booking_date + "T00:00:00");
     const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -227,12 +228,38 @@ export async function POST(req: Request) {
       );
     }
 
-    if (booking_time < dayHours.start || booking_time > dayHours.end) {
+    const dayStart = timeToMinutes(dayHours.start);
+    const dayEnd = timeToMinutes(dayHours.end);
+    if (
+      dayStart === null ||
+      dayEnd === null ||
+      startMinutes < dayStart ||
+      startMinutes + durationMinutes > dayEnd
+    ) {
       return NextResponse.json(
         { error: "Requested time is outside working hours" },
         { status: 400 }
       );
     }
+  }
+
+  // Check for bookings that overlap the requested interval. A service takes
+  // `duration_minutes`, so a booking blocks the whole [start, start+duration)
+  // window, not just its starting minute.
+  const { data: existingBookings } = await supabase
+    .from("bookings")
+    .select("booking_time, service:services!inner(duration_minutes)")
+    .eq("user_id", user_id)
+    .eq("booking_date", booking_date)
+    .neq("status", "cancelled");
+
+  const existingSlots = toBookedSlots(existingBookings);
+
+  if (findOverlappingSlot(existingSlots, booking_time, durationMinutes)) {
+    return NextResponse.json(
+      { error: "This time slot is already booked" },
+      { status: 409 }
+    );
   }
 
   const { data, error } = await supabase
@@ -251,9 +278,10 @@ export async function POST(req: Request) {
     .single();
 
   if (error) {
-    // The unique index on (user_id, booking_date, booking_time) guards the
-    // race between the conflict check above and the insert.
-    if (error.code === "23505") {
+    // The unique index on (user_id, booking_date, booking_time) and the
+    // overlap trigger both guard the race between the conflict check and the
+    // insert (23505 exact start, 23P01 overlapping interval).
+    if (error.code === "23505" || error.code === "23P01") {
       return NextResponse.json(
         { error: "This time slot is already booked" },
         { status: 409 }
@@ -268,7 +296,7 @@ export async function POST(req: Request) {
       business,
       serviceTitle: service.title,
       bookingDate: booking_date,
-      bookingTime: booking_time,
+      bookingTime: `${booking_time}–${endTime}`,
       customerName: customer_name,
       customerPhone: customer_phone,
       customerNotes: customer_notes,

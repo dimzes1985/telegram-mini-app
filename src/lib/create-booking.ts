@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notifyOwner } from "@/lib/notify-owner";
+import {
+  bookingEndTime,
+  findOverlappingSlot,
+  timeToMinutes,
+  toBookedSlots,
+} from "@/lib/slot";
 
 export interface CreateBookingInput {
   service_title: string;
@@ -70,7 +76,7 @@ export async function createBookingForBusiness(
   // Find the requested service (case-insensitive exact title match).
   const { data: services } = await supabase
     .from("services")
-    .select("id, title, price")
+    .select("id, title, price, duration_minutes")
     .eq("user_id", businessId)
     .eq("active", true);
 
@@ -87,7 +93,15 @@ export async function createBookingForBusiness(
     };
   }
 
-  // Validate the requested time is within the business working hours.
+  const durationMinutes = service.duration_minutes ?? 30;
+  const startMinutes = timeToMinutes(bookingTime);
+  if (startMinutes === null) {
+    return { ok: false, error: "Неверный формат времени (нужен ЧЧ:ММ)." };
+  }
+  const endTime = bookingEndTime(bookingTime, durationMinutes);
+
+  // Validate the requested time fits within the business working hours,
+  // including the full service duration (start and end inside the work day).
   if (business?.working_hours) {
     const dayName = DAY_NAMES[dateObj.getDay()];
     const dayHours = (
@@ -100,7 +114,14 @@ export async function createBookingForBusiness(
     if (!dayHours?.enabled) {
       return { ok: false, error: "Библиотека в этот день не работает." };
     }
-    if (bookingTime < dayHours.start || bookingTime > dayHours.end) {
+    const dayStart = timeToMinutes(dayHours.start);
+    const dayEnd = timeToMinutes(dayHours.end);
+    if (
+      dayStart === null ||
+      dayEnd === null ||
+      startMinutes < dayStart ||
+      startMinutes + durationMinutes > dayEnd
+    ) {
       return {
         ok: false,
         error: `Время вне режима работы: библиотека работает с ${dayHours.start} до ${dayHours.end}.`,
@@ -108,16 +129,19 @@ export async function createBookingForBusiness(
     }
   }
 
-  // Check for conflicting bookings in the same slot.
+  // Check for bookings that overlap the requested interval. A service takes
+  // `duration_minutes`, so a booking blocks the whole [start, start+duration)
+  // window, not just its starting minute.
   const { data: existing } = await supabase
     .from("bookings")
-    .select("id")
+    .select("booking_time, service:services!inner(duration_minutes)")
     .eq("user_id", businessId)
     .eq("booking_date", bookingDate)
-    .eq("booking_time", bookingTime)
     .neq("status", "cancelled");
 
-  if (existing && existing.length > 0) {
+  const existingSlots = toBookedSlots(existing);
+
+  if (findOverlappingSlot(existingSlots, bookingTime, durationMinutes)) {
     return {
       ok: false,
       error: "Это время уже занято. Предложите клиенту другое время.",
@@ -140,7 +164,9 @@ export async function createBookingForBusiness(
     .single();
 
   if (error) {
-    if (error.code === "23505") {
+    // The unique index on (user_id, booking_date, booking_time) and the
+    // overlap trigger both guard races between the check and the insert.
+    if (error.code === "23505" || error.code === "23P01") {
       return {
         ok: false,
         error: "Это время уже занято. Предложите клиенту другое время.",
@@ -156,7 +182,7 @@ export async function createBookingForBusiness(
       "",
       `🛠 Услуга: ${service.title}`,
       `📅 Дата: ${formatDate(bookingDate)}`,
-      `🕒 Время: ${bookingTime}`,
+      `🕒 Время: ${bookingTime}–${endTime}`,
       `👤 Клиент: ${input.customer_name}`,
       `📞 Телефон: ${input.customer_phone || "не указан"}`,
     ].join("\n"));
@@ -165,6 +191,6 @@ export async function createBookingForBusiness(
   return {
     ok: true,
     booking,
-    message: `Запись создана: ${service.title}, ${formatDate(bookingDate)} в ${bookingTime}.`,
+    message: `Запись создана: ${service.title}, ${formatDate(bookingDate)} с ${bookingTime} до ${endTime}.`,
   };
 }
