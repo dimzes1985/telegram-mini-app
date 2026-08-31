@@ -39,24 +39,59 @@ export function escapeHtml(value: string): string {
 }
 
 // Sends a plain-text notification to the business owner's configured Telegram
-// and/or MAX chats. Never throws - a failed notification must not fail the
+// and/or MAX chats. Never rejects - a failed notification must not fail the
 // caller (e.g. a booking or a payment event).
-export function notifyOwner(targets: OwnerNotifyTargets, text: string): void {
+//
+// Returns a promise so callers can await delivery. On serverless runtimes the
+// request lifecycle can otherwise drop the in-flight HTTP calls right after the
+// response is returned, so notifications must be awaited (or at least started
+// and kept alive) to actually reach the owner.
+export async function notifyOwner(
+  targets: OwnerNotifyTargets,
+  text: string
+): Promise<void> {
+  const deliveries: Promise<unknown>[] = [];
+
   if (targets.telegram_notify_chat_id && targets.bot_token) {
     const chatId = Number(targets.telegram_notify_chat_id);
     if (Number.isFinite(chatId)) {
-      sendTelegramMessage(targets.bot_token, chatId, escapeHtml(text)).catch(
-        (e) => console.error("Owner notification (Telegram) failed:", e)
+      deliveries.push(
+        sendTelegramMessage(targets.bot_token, chatId, escapeHtml(text))
+          .then((result) => {
+            // Telegram answers with { ok: false, description } for rejected
+            // messages (unknown chat, bot not started by the owner, ...).
+            // Surface it instead of swallowing it silently.
+            if (result && result.ok === false) {
+              throw new Error(
+                result.description || `Telegram API error (${result.error_code ?? "?"})`
+              );
+            }
+          })
+          .catch((e) =>
+            console.error("Owner notification (Telegram) failed:", e)
+          )
       );
     }
+  } else if (targets.bot_token) {
+    console.warn(
+      "Owner notification (Telegram) skipped: telegram_notify_chat_id is not set"
+    );
   }
 
   if (targets.max_notify_user_id && targets.max_bot_token) {
     const maxUserId = Number(targets.max_notify_user_id);
     if (Number.isFinite(maxUserId)) {
-      sendMaxMessage(targets.max_bot_token, maxUserId, text).catch((e) =>
-        console.error("Owner notification (MAX) failed:", e)
+      deliveries.push(
+        sendMaxMessage(targets.max_bot_token, maxUserId, text).catch((e) =>
+          console.error("Owner notification (MAX) failed:", e)
+        )
       );
     }
+  } else if (targets.max_bot_token) {
+    console.warn(
+      "Owner notification (MAX) skipped: max_notify_user_id is not set"
+    );
   }
+
+  await Promise.allSettled(deliveries);
 }

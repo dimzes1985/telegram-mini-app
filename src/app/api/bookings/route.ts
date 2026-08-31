@@ -57,8 +57,10 @@ interface BookingNotificationInput {
 }
 
 // Builds the new-booking message and sends it to the owner's channels.
-// Non-blocking: a failed notification must not fail the booking.
-function notifyBookingOwner(input: BookingNotificationInput): void {
+// The notification is awaited so it is delivered before the request ends:
+// on serverless runtimes fire-and-forget HTTP calls are dropped otherwise.
+// A failed notification must not fail the booking (notifyOwner never rejects).
+async function notifyBookingOwner(input: BookingNotificationInput): Promise<void> {
   const {
     business,
     serviceTitle,
@@ -82,7 +84,7 @@ function notifyBookingOwner(input: BookingNotificationInput): void {
     lines.push(`📝 Комментарий: ${customerNotes}`);
   }
 
-  notifyOwner(business, lines.join("\n"));
+  await notifyOwner(business, lines.join("\n"));
 }
 
 // GET all bookings for the logged-in user (admin view)
@@ -290,9 +292,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Notify the owner (non-blocking; a notification failure must not fail the booking)
+  // Notify the owner (awaited for delivery; notifyOwner never rejects, so a
+  // failed notification cannot fail the booking)
   if (data && business) {
-    notifyBookingOwner({
+    await notifyBookingOwner({
       business,
       serviceTitle: service.title,
       bookingDate: booking_date,

@@ -61,7 +61,7 @@ export async function POST(req: Request) {
         .update({ status: "past_due", updated_at: new Date().toISOString() })
         .eq("user_id", sub.user_id);
       const targets = await loadOwnerNotifyTargets(admin, sub.user_id);
-      notifyOwner(
+      await notifyOwner(
         targets,
         `Внимание: у подписки пользователя ${sub.user_id} нет сохранённого метода оплаты — автопродление невозможно. Подписка переведена в статус past_due.`
       );
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
         .update({ status: "past_due", updated_at: new Date().toISOString() })
         .eq("user_id", sub.user_id);
       const targets = await loadOwnerNotifyTargets(admin, sub.user_id);
-      notifyOwner(
+      await notifyOwner(
         targets,
         `Внимание: автопродление тарифа пользователя ${sub.user_id} завершилось ошибкой. Подписка переведена в статус past_due.`
       );

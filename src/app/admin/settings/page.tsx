@@ -61,6 +61,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [settingUpBot, setSettingUpBot] = useState(false);
   const [settingUpMaxBot, setSettingUpMaxBot] = useState(false);
+  const [testingNotification, setTestingNotification] = useState(false);
+  const [notificationTestResult, setNotificationTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [botError, setBotError] = useState("");
   const [maxBotError, setMaxBotError] = useState("");
   const [plan, setPlan] = useState("free");
@@ -197,6 +199,34 @@ export default function SettingsPage() {
       ...prev,
       [day]: { ...prev[day], [field]: value },
     }));
+  };
+
+  const handleTestNotification = async () => {
+    setTestingNotification(true);
+    setNotificationTestResult(null);
+
+    try {
+      const res = await fetch("/api/notifications/test", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setNotificationTestResult({
+          ok: true,
+          message: `Уведомление отправлено в: ${(data.sent_to || []).join(", ")}`,
+        });
+      } else {
+        setNotificationTestResult({
+          ok: false,
+          message: data.error || "Не удалось отправить тестовое уведомление",
+        });
+      }
+    } catch {
+      setNotificationTestResult({
+        ok: false,
+        message: "Ошибка соединения",
+      });
+    }
+
+    setTestingNotification(false);
   };
 
   if (loading) {
@@ -480,6 +510,31 @@ export default function SettingsPage() {
               />
               <p className="text-sm text-gray-500 mt-1">
                 Ваш ID в MAX Messenger. Уведомления придут от вашего MAX-бота.
+              </p>
+            </div>
+            <div className="pt-2 border-t">
+              <Button
+                variant="outline"
+                onClick={handleTestNotification}
+                disabled={testingNotification}
+              >
+                <Bell className="h-4 w-4 mr-2" />
+                {testingNotification
+                  ? "Отправка..."
+                  : "Отправить тестовое уведомление"}
+              </Button>
+              {notificationTestResult && (
+                <p
+                  className={`text-sm mt-2 ${
+                    notificationTestResult.ok ? "text-green-600" : "text-red-500"
+                  }`}
+                >
+                  {notificationTestResult.message}
+                </p>
+              )}
+              <p className="text-sm text-gray-500 mt-2">
+                Нажмите, чтобы проверить, что уведомления о новых записях
+                доходят до Telegram и MAX. Сначала сохраните настройки.
               </p>
             </div>
           </CardContent>

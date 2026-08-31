@@ -204,7 +204,7 @@ export async function POST(req: Request) {
         .eq("user_id", userId);
 
       const targets = await loadOwnerNotifyTargets(admin, userId);
-      notifyOwner(
+      await notifyOwner(
         targets,
         `Внимание: автопродление тарифа не удалось (пользователь ${userId}). Подписка переведена в статус past_due.`
       );

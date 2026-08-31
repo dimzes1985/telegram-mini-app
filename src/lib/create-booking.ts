@@ -175,9 +175,11 @@ export async function createBookingForBusiness(
     return { ok: false, error: "Не удалось создать запись, попробуйте ещё раз." };
   }
 
-  // Notify the owner (non-blocking).
+  // Notify the owner. Await delivery so the message is not dropped when the
+  // request lifecycle ends; notifyOwner never rejects, so a failed
+  // notification cannot fail the booking.
   if (business) {
-    notifyOwner(business, [
+    await notifyOwner(business, [
       "🔔 Новая запись!",
       "",
       `🛠 Услуга: ${service.title}`,
