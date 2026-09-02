@@ -208,15 +208,27 @@ export default function SettingsPage() {
     try {
       const res = await fetch("/api/notifications/test", { method: "POST" });
       const data = await res.json();
-      if (res.ok) {
+      const channels: Array<{ channel: string; status: string; reason?: string }> =
+        data.channels || [];
+      if (channels.length > 0) {
+        const labels: Record<string, string> = {
+          telegram: "Telegram",
+          max: "MAX",
+        };
+        const lines = channels.map((c) => {
+          const name = labels[c.channel] || c.channel;
+          if (c.status === "sent") return `${name}: отправлено`;
+          if (c.status === "skipped") return `${name}: пропущено (${c.reason || "не настроен"})`;
+          return `${name}: ошибка (${c.reason || "неизвестно"})`;
+        });
         setNotificationTestResult({
-          ok: true,
-          message: `Уведомление отправлено в: ${(data.sent_to || []).join(", ")}`,
+          ok: data.success === true,
+          message: lines.join(" · "),
         });
       } else {
         setNotificationTestResult({
-          ok: false,
-          message: data.error || "Не удалось отправить тестовое уведомление",
+          ok: data.success === true,
+          message: data.error || "Уведомление отправлено",
         });
       }
     } catch {

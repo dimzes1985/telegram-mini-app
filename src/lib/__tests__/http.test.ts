@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { escapeHtml } from "@/lib/notify-owner";
 import {
   parseJsonBody,
   invalidJsonResponse,
@@ -7,20 +6,6 @@ import {
   dateString,
   timeString,
 } from "@/lib/http";
-
-describe("escapeHtml", () => {
-  it("escapes HTML special characters", () => {
-    expect(escapeHtml(`<b>& "quote"</b>`)).toBe(
-      "&lt;b&gt;&amp; &quot;quote&quot;&lt;/b&gt;"
-    );
-  });
-
-  it("leaves plain text untouched", () => {
-    expect(escapeHtml("Иван ivanov@example.com")).toBe(
-      "Иван ivanov@example.com"
-    );
-  });
-});
 
 describe("parseJsonBody", () => {
   it("parses a valid JSON body", async () => {

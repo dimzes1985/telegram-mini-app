@@ -10,6 +10,13 @@ export interface OwnerNotifyTargets {
   max_notify_user_id?: string | null;
 }
 
+// Outcome of one notification channel.
+export interface ChannelDeliveryResult {
+  channel: "telegram" | "max";
+  status: "sent" | "skipped" | "failed";
+  reason?: string;
+}
+
 // Loads the notification destinations for a business owner from the users row.
 export async function loadOwnerNotifyTargets(
   supabase: SupabaseClient,
@@ -30,68 +37,112 @@ export async function loadOwnerNotifyTargets(
   };
 }
 
+// Telegram's HTML parser supports only the &lt;, &gt; and &amp; entities.
+// &quot; is NOT a valid entity - it makes Telegram reject the whole message
+// with "can't parse entities", so quotes must be left as-is.
 export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/>/g, "&gt;");
 }
 
 // Sends a plain-text notification to the business owner's configured Telegram
 // and/or MAX chats. Never rejects - a failed notification must not fail the
-// caller (e.g. a booking or a payment event).
-//
-// Returns a promise so callers can await delivery. On serverless runtimes the
-// request lifecycle can otherwise drop the in-flight HTTP calls right after the
-// response is returned, so notifications must be awaited (or at least started
-// and kept alive) to actually reach the owner.
+// caller (e.g. a booking or a payment event). Returns the per-channel outcome
+// so callers can surface or log exactly why a channel was skipped or failed.
 export async function notifyOwner(
   targets: OwnerNotifyTargets,
   text: string
-): Promise<void> {
-  const deliveries: Promise<unknown>[] = [];
-
-  if (targets.telegram_notify_chat_id && targets.bot_token) {
+): Promise<ChannelDeliveryResult[]> {
+  const deliverTelegram = async (): Promise<ChannelDeliveryResult> => {
+    if (!targets.bot_token) {
+      return {
+        channel: "telegram",
+        status: "skipped",
+        reason: "bot_token is not set",
+      };
+    }
+    if (!targets.telegram_notify_chat_id) {
+      console.warn(
+        "Owner notification (Telegram) skipped: telegram_notify_chat_id is not set"
+      );
+      return {
+        channel: "telegram",
+        status: "skipped",
+        reason: "telegram_notify_chat_id is not set",
+      };
+    }
     const chatId = Number(targets.telegram_notify_chat_id);
-    if (Number.isFinite(chatId)) {
-      deliveries.push(
-        sendTelegramMessage(targets.bot_token, chatId, escapeHtml(text))
-          .then((result) => {
-            // Telegram answers with { ok: false, description } for rejected
-            // messages (unknown chat, bot not started by the owner, ...).
-            // Surface it instead of swallowing it silently.
-            if (result && result.ok === false) {
-              throw new Error(
-                result.description || `Telegram API error (${result.error_code ?? "?"})`
-              );
-            }
-          })
-          .catch((e) =>
-            console.error("Owner notification (Telegram) failed:", e)
-          )
-      );
+    if (!Number.isFinite(chatId)) {
+      return {
+        channel: "telegram",
+        status: "skipped",
+        reason: `invalid chat id: "${targets.telegram_notify_chat_id}"`,
+      };
     }
-  } else if (targets.bot_token) {
-    console.warn(
-      "Owner notification (Telegram) skipped: telegram_notify_chat_id is not set"
-    );
-  }
+    try {
+      const response = await sendTelegramMessage(
+        targets.bot_token,
+        chatId,
+        escapeHtml(text)
+      );
+      if (response && response.ok === false) {
+        const reason =
+          response.description || `Telegram API error (${response.error_code ?? "?"})`;
+        console.error("Owner notification (Telegram) failed:", reason);
+        return { channel: "telegram", status: "failed", reason };
+      }
+      return { channel: "telegram", status: "sent" };
+    } catch (e) {
+      console.error("Owner notification (Telegram) failed:", e);
+      return {
+        channel: "telegram",
+        status: "failed",
+        reason: e instanceof Error ? e.message : String(e),
+      };
+    }
+  };
 
-  if (targets.max_notify_user_id && targets.max_bot_token) {
+  const deliverMax = async (): Promise<ChannelDeliveryResult> => {
+    if (!targets.max_bot_token) {
+      return {
+        channel: "max",
+        status: "skipped",
+        reason: "max_bot_token is not set",
+      };
+    }
+    if (!targets.max_notify_user_id) {
+      console.warn(
+        "Owner notification (MAX) skipped: max_notify_user_id is not set"
+      );
+      return {
+        channel: "max",
+        status: "skipped",
+        reason: "max_notify_user_id is not set",
+      };
+    }
     const maxUserId = Number(targets.max_notify_user_id);
-    if (Number.isFinite(maxUserId)) {
-      deliveries.push(
-        sendMaxMessage(targets.max_bot_token, maxUserId, text).catch((e) =>
-          console.error("Owner notification (MAX) failed:", e)
-        )
-      );
+    if (!Number.isFinite(maxUserId)) {
+      return {
+        channel: "max",
+        status: "skipped",
+        reason: `invalid user id: "${targets.max_notify_user_id}"`,
+      };
     }
-  } else if (targets.max_bot_token) {
-    console.warn(
-      "Owner notification (MAX) skipped: max_notify_user_id is not set"
-    );
-  }
+    try {
+      await sendMaxMessage(targets.max_bot_token, maxUserId, text);
+      return { channel: "max", status: "sent" };
+    } catch (e) {
+      console.error("Owner notification (MAX) failed:", e);
+      return {
+        channel: "max",
+        status: "failed",
+        reason: e instanceof Error ? e.message : String(e),
+      };
+    }
+  };
 
-  await Promise.allSettled(deliveries);
+  const [telegram, max] = await Promise.all([deliverTelegram(), deliverMax()]);
+  return [telegram, max];
 }

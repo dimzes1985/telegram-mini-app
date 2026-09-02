@@ -19,9 +19,9 @@ beforeEach(() => {
 });
 
 describe("escapeHtml", () => {
-  it("escapes HTML special characters", () => {
+  it("escapes only the entities Telegram supports (<, >, &)", () => {
     expect(escapeHtml(`<b>&"quote"</b>`)).toBe(
-      "&lt;b&gt;&amp;&quot;quote&quot;&lt;/b&gt;"
+      `&lt;b&gt;&amp;"quote"&lt;/b&gt;`
     );
   });
 });
@@ -31,7 +31,7 @@ describe("notifyOwner", () => {
     mocks.sendTelegramMessage.mockResolvedValue({ ok: true });
     mocks.sendMaxMessage.mockResolvedValue({ success: true });
 
-    await notifyOwner(
+    const results = await notifyOwner(
       {
         bot_token: "tg-token",
         telegram_notify_chat_id: "123",
@@ -41,18 +41,20 @@ describe("notifyOwner", () => {
       "🔔 Новая запись!"
     );
 
-    expect(mocks.sendTelegramMessage).toHaveBeenCalledTimes(1);
     expect(mocks.sendTelegramMessage).toHaveBeenCalledWith(
       "tg-token",
       123,
       "🔔 Новая запись!"
     );
-    expect(mocks.sendMaxMessage).toHaveBeenCalledTimes(1);
     expect(mocks.sendMaxMessage).toHaveBeenCalledWith(
       "max-token",
       456,
       "🔔 Новая запись!"
     );
+    expect(results).toEqual([
+      { channel: "telegram", status: "sent" },
+      { channel: "max", status: "sent" },
+    ]);
   });
 
   it("escapes the message for Telegram but sends it raw to MAX", async () => {
@@ -66,57 +68,83 @@ describe("notifyOwner", () => {
         max_bot_token: "max-token",
         max_notify_user_id: "456",
       },
-      "Клиент: <Иван> & партнёр"
+      "Клиент: <Иван> & \"партнёр\""
     );
 
     expect(mocks.sendTelegramMessage).toHaveBeenCalledWith(
       "tg-token",
       123,
-      "Клиент: &lt;Иван&gt; &amp; партнёр"
+      "Клиент: &lt;Иван&gt; &amp; \"партнёр\""
     );
     expect(mocks.sendMaxMessage).toHaveBeenCalledWith(
       "max-token",
       456,
-      "Клиент: <Иван> & партнёр"
+      "Клиент: <Иван> & \"партнёр\""
     );
   });
 
-  it("skips Telegram when the chat id is not set", async () => {
+  it("reports Telegram skipped when bot_token is missing", async () => {
+    mocks.sendMaxMessage.mockResolvedValue({ success: true });
+
+    const results = await notifyOwner(
+      { max_bot_token: "max-token", max_notify_user_id: "456" },
+      "🔔 Новая запись!"
+    );
+
+    expect(mocks.sendTelegramMessage).not.toHaveBeenCalled();
+    expect(results[0]).toMatchObject({
+      channel: "telegram",
+      status: "skipped",
+      reason: "bot_token is not set",
+    });
+    expect(results[1]).toEqual({ channel: "max", status: "sent" });
+  });
+
+  it("reports Telegram skipped when the chat id is not set", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mocks.sendMaxMessage.mockResolvedValue({ success: true });
 
-    await notifyOwner(
+    const results = await notifyOwner(
       { bot_token: "tg-token", max_bot_token: "max-token", max_notify_user_id: "456" },
       "🔔 Новая запись!"
     );
 
     expect(mocks.sendTelegramMessage).not.toHaveBeenCalled();
-    expect(mocks.sendMaxMessage).toHaveBeenCalledTimes(1);
+    expect(results[0]).toMatchObject({
+      channel: "telegram",
+      status: "skipped",
+      reason: "telegram_notify_chat_id is not set",
+    });
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
 
-  it("skips MAX when the user id is not set", async () => {
+  it("reports MAX skipped when the user id is not set", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mocks.sendTelegramMessage.mockResolvedValue({ ok: true });
 
-    await notifyOwner(
+    const results = await notifyOwner(
       { bot_token: "tg-token", telegram_notify_chat_id: "123", max_bot_token: "max-token" },
       "🔔 Новая запись!"
     );
 
     expect(mocks.sendMaxMessage).not.toHaveBeenCalled();
-    expect(mocks.sendTelegramMessage).toHaveBeenCalledTimes(1);
+    expect(results[1]).toMatchObject({
+      channel: "max",
+      status: "skipped",
+      reason: "max_notify_user_id is not set",
+    });
     warn.mockRestore();
   });
 
-  it("sends nothing when no channel is configured", async () => {
-    await notifyOwner({}, "🔔 Новая запись!");
+  it("sends nothing and reports skips when no channel is configured", async () => {
+    const results = await notifyOwner({}, "🔔 Новая запись!");
     expect(mocks.sendTelegramMessage).not.toHaveBeenCalled();
     expect(mocks.sendMaxMessage).not.toHaveBeenCalled();
+    expect(results.map((r) => r.status)).toEqual(["skipped", "skipped"]);
   });
 
-  it("does not reject when Telegram answers with ok:false", async () => {
+  it("reports Telegram failed when it answers with ok:false", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     mocks.sendTelegramMessage.mockResolvedValue({
       ok: false,
@@ -124,29 +152,38 @@ describe("notifyOwner", () => {
       description: "Bad Request: chat not found",
     });
 
-    await expect(
-      notifyOwner({ bot_token: "tg-token", telegram_notify_chat_id: "123" }, "test")
-    ).resolves.toBeUndefined();
+    const results = await notifyOwner(
+      { bot_token: "tg-token", telegram_notify_chat_id: "123" },
+      "test"
+    );
+
+    expect(results[0]).toMatchObject({
+      channel: "telegram",
+      status: "failed",
+      reason: "Bad Request: chat not found",
+    });
     expect(error).toHaveBeenCalled();
     error.mockRestore();
   });
 
-  it("does not reject when a sender throws", async () => {
+  it("does not reject when a sender throws; reports failed", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     mocks.sendTelegramMessage.mockRejectedValue(new Error("network"));
     mocks.sendMaxMessage.mockRejectedValue(new Error("network"));
 
-    await expect(
-      notifyOwner(
-        {
-          bot_token: "tg-token",
-          telegram_notify_chat_id: "123",
-          max_bot_token: "max-token",
-          max_notify_user_id: "456",
-        },
-        "test"
-      )
-    ).resolves.toBeUndefined();
+    const results = await notifyOwner(
+      {
+        bot_token: "tg-token",
+        telegram_notify_chat_id: "123",
+        max_bot_token: "max-token",
+        max_notify_user_id: "456",
+      },
+      "test"
+    );
+
+    expect(results.map((r) => r.status)).toEqual(["failed", "failed"]);
+    expect(results[0].reason).toBe("network");
+    expect(results[1].reason).toBe("network");
     error.mockRestore();
   });
 });

@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 // POST - sends a test notification to the owner's configured Telegram and/or
 // MAX channels, so the owner can verify that notifications work without
-// creating a real booking.
+// creating a real booking. Reports the per-channel result (sent / skipped /
+// failed + reason) so the UI can explain why a channel is not delivering.
 export async function POST() {
   const supabase = await createClient();
 
@@ -37,17 +38,11 @@ export async function POST() {
 
   // Await delivery so the result is truthful (a dropped notification would
   // otherwise look like a success).
-  await notifyOwner(
+  const channels = await notifyOwner(
     targets,
     "🔔 Тестовое уведомление: канал настроен и работает!"
   );
 
-  const delivered: string[] = [];
-  if (telegramConfigured) delivered.push("telegram");
-  if (maxConfigured) delivered.push("max");
-
-  return NextResponse.json({
-    success: true,
-    sent_to: delivered,
-  });
+  const anySent = channels.some((c) => c.status === "sent");
+  return NextResponse.json({ success: anySent, channels });
 }
