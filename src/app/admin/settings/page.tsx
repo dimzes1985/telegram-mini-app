@@ -205,11 +205,18 @@ export default function SettingsPage() {
     setTestingNotification(true);
     setNotificationTestResult(null);
 
+    let res: Response | null = null;
     try {
-      const res = await fetch("/api/notifications/test", { method: "POST" });
-      const data = await res.json();
-      const channels: Array<{ channel: string; status: string; reason?: string }> =
-        data.channels || [];
+      res = await fetch("/api/notifications/test", { method: "POST" });
+      const raw = await res.text();
+      let data: { success?: boolean; error?: string; channels?: Array<{ channel: string; status: string; reason?: string }> } = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        // non-JSON body (e.g. an HTML error page) - handled below
+      }
+
+      const channels = data.channels || [];
       if (channels.length > 0) {
         const labels: Record<string, string> = {
           telegram: "Telegram",
@@ -218,27 +225,46 @@ export default function SettingsPage() {
         const lines = channels.map((c) => {
           const name = labels[c.channel] || c.channel;
           if (c.status === "sent") return `${name}: отправлено`;
-          if (c.status === "skipped") return `${name}: пропущено (${c.reason || "не настроен"})`;
+          if (c.status === "skipped")
+            return `${name}: пропущено (${c.reason || "не настроен"})`;
           return `${name}: ошибка (${c.reason || "неизвестно"})`;
         });
         setNotificationTestResult({
           ok: data.success === true,
           message: lines.join(" · "),
         });
-      } else {
-        setNotificationTestResult({
-          ok: data.success === true,
-          message: data.error || "Уведомление отправлено",
-        });
+        return;
       }
+
+      if (data.error) {
+        setNotificationTestResult({ ok: false, message: data.error });
+        return;
+      }
+
+      if (!res.ok || !data.success) {
+        setNotificationTestResult({
+          ok: false,
+          message: `Сервер ответил: ${res.status} ${res.statusText}${
+            raw ? ` — ${raw.slice(0, 200)}` : ""
+          }`,
+        });
+        return;
+      }
+
+      setNotificationTestResult({
+        ok: true,
+        message: "Уведомление отправлено",
+      });
     } catch {
       setNotificationTestResult({
         ok: false,
-        message: "Ошибка соединения",
+        message: res
+          ? `Ошибка соединения (HTTP ${res.status})`
+          : "Ошибка соединения — не удалось обратиться к серверу",
       });
+    } finally {
+      setTestingNotification(false);
     }
-
-    setTestingNotification(false);
   };
 
   if (loading) {
