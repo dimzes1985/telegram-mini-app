@@ -65,6 +65,7 @@ export default function SettingsPage() {
   const [notificationTestResult, setNotificationTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [botError, setBotError] = useState("");
   const [maxBotError, setMaxBotError] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [plan, setPlan] = useState("free");
   const [aiUsage, setAiUsage] = useState<{ plan: string; used: number; limit: number; remaining: number } | null>(null);
 
@@ -119,6 +120,8 @@ export default function SettingsPage() {
     setSaving(true);
     setSaved(false);
     setBotError("");
+    setMaxBotError("");
+    setSaveError("");
 
     const updateData: Record<string, unknown> = {
       business_name: businessName,
@@ -142,15 +145,25 @@ export default function SettingsPage() {
       updateData.max_bot_token = maxBotToken;
     }
 
-    await fetch("/api/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updateData),
-    });
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setSaveError(data.error || `Ошибка сохранения (HTTP ${res.status})`);
+      } else {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
+    } catch {
+      setSaveError("Ошибка соединения при сохранении");
+    }
 
     setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   };
 
   const handleSetupBot = async () => {
@@ -678,6 +691,12 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {saveError && (
+          <div className="p-3 bg-red-50 rounded-lg text-red-600 text-sm">
+            {saveError}
+          </div>
+        )}
 
         <div className="flex justify-end">
           <Button onClick={handleSave} disabled={saving}>

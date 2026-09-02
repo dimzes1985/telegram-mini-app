@@ -150,35 +150,64 @@ export async function PUT(req: Request) {
   if (telegram_notify_chat_id !== undefined) updateData.telegram_notify_chat_id = telegram_notify_chat_id;
   if (max_notify_user_id !== undefined) updateData.max_notify_user_id = max_notify_user_id;
 
-  // Handle bot token - only update if it's not the masked value
+  // Handle bot token - only update if it's not the masked value.
+  // The token is validated against Telegram's getMe BEFORE saving: an invalid
+  // token silently stored in the DB is what makes owner notifications (and the
+  // bot itself) fail later with 404 "Not Found".
   if (bot_token !== undefined && bot_token && !bot_token.startsWith("••••")) {
-    updateData.bot_token = bot_token;
-    // Extract username from token by calling Telegram API
+    let telegramUsername: string | null = null;
     try {
       const response = await fetch(
         `https://api.telegram.org/bot${bot_token}/getMe`
       );
       const data = await response.json();
-      if (data.ok) {
-        updateData.bot_username = data.result.username;
+      if (!data.ok) {
+        return NextResponse.json(
+          {
+            error: `Неверный токен Telegram-бота: ${
+              data.description || "проверьте токен в @BotFather"
+            }`,
+          },
+          { status: 400 }
+        );
       }
+      telegramUsername = data.result?.username || null;
     } catch {
-      // Ignore error, token might be invalid
+      return NextResponse.json(
+        {
+          error:
+            "Не удалось проверить токен Telegram-бота (сетевая ошибка). Попробуйте ещё раз.",
+        },
+        { status: 502 }
+      );
     }
+    updateData.bot_token = bot_token;
+    updateData.bot_username = telegramUsername;
   }
   if (bot_username !== undefined) updateData.bot_username = bot_username;
 
-  // Handle MAX bot token - only update if it's not the masked value
+  // Handle MAX bot token - only update if it's not the masked value.
+  // Also validated up-front so a bad token is never silently stored.
   if (max_bot_token !== undefined && max_bot_token && !max_bot_token.startsWith("••••")) {
-    updateData.max_bot_token = max_bot_token;
-    updateData.max_bot_webhook_set = false;
-    // Resolve the bot public name from the MAX API
+    const explicitMaxUsername =
+      typeof max_bot_username === "string" ? max_bot_username : null;
+    let maxBotUsername: string | null = null;
     try {
       const info = await getMaxBotInfo(max_bot_token);
-      updateData.max_bot_username = info.username || max_bot_username || null;
-    } catch {
-      if (max_bot_username !== undefined) updateData.max_bot_username = max_bot_username;
+      maxBotUsername = info.username || explicitMaxUsername;
+    } catch (e) {
+      return NextResponse.json(
+        {
+          error: `Неверный токен MAX-бота: ${
+            e instanceof Error ? e.message : "проверьте токен"
+          }`,
+        },
+        { status: 400 }
+      );
     }
+    updateData.max_bot_token = max_bot_token;
+    updateData.max_bot_webhook_set = false;
+    updateData.max_bot_username = maxBotUsername;
   }
   if (max_bot_username !== undefined) updateData.max_bot_username = max_bot_username;
 
