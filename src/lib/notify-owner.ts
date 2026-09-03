@@ -47,6 +47,28 @@ export function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;");
 }
 
+// Turns raw Telegram API error text into a human-readable Russian hint so the
+// owner understands what to fix in the admin settings.
+export function humanizeTelegramError(description: string): string {
+  const d = description.toLowerCase();
+  if (d.includes("can't send messages to") && d.includes("bot")) {
+    return "указанный chat ID принадлежит боту — нужен личный ID человека (через @userinfobot)";
+  }
+  if (d.includes("bot was blocked")) {
+    return "вы заблокировали бота — откройте чат с ботом и нажмите «Разблокировать», затем /start";
+  }
+  if (d.includes("chat not found")) {
+    return "чат не найден — сначала напишите боту /start из своего аккаунта";
+  }
+  if (d.includes("user is deactivated")) {
+    return "аккаунт получателя деактивирован";
+  }
+  if (d.includes("bot was kicked") || d.includes("group chat was deactivated")) {
+    return "бот исключён из чата — добавьте его заново";
+  }
+  return description;
+}
+
 // Sends a plain-text notification to the business owner's configured Telegram
 // and/or MAX chats. Never rejects - a failed notification must not fail the
 // caller (e.g. a booking or a payment event). Returns the per-channel outcome
@@ -88,8 +110,10 @@ export async function notifyOwner(
         escapeHtml(text)
       );
       if (response && response.ok === false) {
-        const reason =
-          response.description || `Telegram API error (${response.error_code ?? "?"})`;
+        const reason = humanizeTelegramError(
+          response.description ||
+            `Telegram API error (${response.error_code ?? "?"})`
+        );
         console.error("Owner notification (Telegram) failed:", reason);
         return { channel: "telegram", status: "failed", reason };
       }

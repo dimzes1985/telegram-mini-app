@@ -12,7 +12,7 @@ vi.mock("@/lib/max-bot", () => ({
   sendMaxMessage: mocks.sendMaxMessage,
 }));
 
-import { notifyOwner, escapeHtml } from "@/lib/notify-owner";
+import { notifyOwner, escapeHtml, humanizeTelegramError } from "@/lib/notify-owner";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -23,6 +23,32 @@ describe("escapeHtml", () => {
     expect(escapeHtml(`<b>&"quote"</b>`)).toBe(
       `&lt;b&gt;&amp;"quote"&lt;/b&gt;`
     );
+  });
+});
+
+describe("humanizeTelegramError", () => {
+  it("explains when the target chat is a bot", () => {
+    expect(
+      humanizeTelegramError("Forbidden: bot can't send messages to the bot")
+    ).toContain("принадлежит боту");
+  });
+
+  it("explains a blocked bot", () => {
+    expect(
+      humanizeTelegramError("Forbidden: bot was blocked by the user")
+    ).toContain("заблокировали бота");
+  });
+
+  it("explains chat not found", () => {
+    expect(
+      humanizeTelegramError("Bad Request: chat not found")
+    ).toContain("чат не найден");
+  });
+
+  it("returns the raw description otherwise", () => {
+    expect(
+      humanizeTelegramError("Some other API error")
+    ).toBe("Some other API error");
   });
 });
 
@@ -160,7 +186,7 @@ describe("notifyOwner", () => {
     expect(results[0]).toMatchObject({
       channel: "telegram",
       status: "failed",
-      reason: "Bad Request: chat not found",
+      reason: "чат не найден — сначала напишите боту /start из своего аккаунта",
     });
     expect(error).toHaveBeenCalled();
     error.mockRestore();
