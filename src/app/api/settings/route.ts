@@ -183,6 +183,10 @@ export async function PUT(req: Request) {
     }
     updateData.bot_token = bot_token;
     updateData.bot_username = telegramUsername;
+    // A new token means the webhook must be re-registered for that token,
+    // otherwise Telegram is not delivering messages to us while the DB flag
+    // would still claim "webhook active".
+    updateData.bot_webhook_set = false;
   }
   if (bot_username !== undefined) updateData.bot_username = bot_username;
 

@@ -49,6 +49,9 @@ export default function SettingsPage() {
   const [botUsername, setBotUsername] = useState("");
   const [botTokenSet, setBotTokenSet] = useState(false);
   const [botWebhookSet, setBotWebhookSet] = useState(false);
+  const [botTokenValid, setBotTokenValid] = useState(true);
+  const [botWebhookUrl, setBotWebhookUrl] = useState("");
+  const [botWebhookLastError, setBotWebhookLastError] = useState("");
   const [maxBotToken, setMaxBotToken] = useState("");
   const [maxBotUsername, setMaxBotUsername] = useState("");
   const [maxBotTokenSet, setMaxBotTokenSet] = useState(false);
@@ -102,6 +105,11 @@ export default function SettingsPage() {
         if (data.configured) {
           setBotUsername(data.username || "");
           setBotWebhookSet(data.webhook_set || false);
+          setBotTokenValid(data.token_valid !== false);
+          setBotWebhookUrl(data.webhook_info?.url || "");
+          setBotWebhookLastError(
+            data.webhook_info?.last_error_message || ""
+          );
         }
       });
 
@@ -115,6 +123,24 @@ export default function SettingsPage() {
         }
       });
   }, []);
+
+  const refreshBotStatus = async () => {
+    try {
+      const res = await fetch("/api/bot/setup");
+      const data = await res.json();
+      if (data.configured) {
+        setBotUsername(data.username || "");
+        setBotWebhookSet(data.webhook_set || false);
+        setBotTokenValid(data.token_valid !== false);
+        setBotWebhookUrl(data.webhook_info?.url || "");
+        setBotWebhookLastError(
+          data.webhook_info?.last_error_message || ""
+        );
+      }
+    } catch {
+      // ignore, status stays as-is
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -158,6 +184,9 @@ export default function SettingsPage() {
       } else {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
+        // A newly saved token resets the webhook flag on the server; refresh
+        // so the "Настроить вебхук" button shows immediately.
+        await refreshBotStatus();
       }
     } catch {
       setSaveError("Ошибка соединения при сохранении");
@@ -183,6 +212,7 @@ export default function SettingsPage() {
       setBotError("Ошибка соединения");
     }
 
+    await refreshBotStatus();
     setSettingUpBot(false);
   };
 
@@ -393,7 +423,7 @@ export default function SettingsPage() {
             </div>
 
             {botUsername && (
-              <div className="p-3 bg-gray-50 rounded-lg">
+              <div className="p-3 bg-gray-50 rounded-lg space-y-1">
                 <p className="text-sm">
                   <span className="font-medium">Бот:</span> @{botUsername}
                 </p>
@@ -402,9 +432,29 @@ export default function SettingsPage() {
                   {botWebhookSet ? (
                     <span className="text-green-600">Активен</span>
                   ) : (
-                    <span className="text-yellow-600">Не настроен</span>
+                    <span className="text-red-600">Не настроен</span>
                   )}
                 </p>
+                {botWebhookUrl && (
+                  <p className="text-sm break-all">
+                    <span className="font-medium">URL вебхука:</span>{" "}
+                    <span className="text-gray-600">{botWebhookUrl}</span>
+                  </p>
+                )}
+                {botWebhookLastError && (
+                  <p className="text-sm text-red-600">
+                    <span className="font-medium">Ошибка Telegram:</span>{" "}
+                    {botWebhookLastError}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {botTokenSet && !botTokenValid && (
+              <div className="p-3 bg-red-50 rounded-lg text-red-600 text-sm">
+                Сохранённый токен недействителен или был отозван в @BotFather.
+                Бот не отвечает. Вставьте актуальный токен из @BotFather и
+                нажмите «Сохранить настройки», затем «Настроить вебхук».
               </div>
             )}
 

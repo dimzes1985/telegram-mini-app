@@ -118,7 +118,6 @@ export async function GET() {
   // Try to get bot data - handle missing columns gracefully
   let botToken: string | null = null;
   let botUsername: string | null = null;
-  let botWebhookSet = false;
 
   try {
     const { data: userData } = await supabase
@@ -129,7 +128,6 @@ export async function GET() {
     if (userData) {
       botToken = userData.bot_token;
       botUsername = userData.bot_username;
-      botWebhookSet = userData.bot_webhook_set || false;
     }
   } catch {
     // Columns might not exist
@@ -139,19 +137,30 @@ export async function GET() {
     return NextResponse.json({ configured: false });
   }
 
+  // Verify the real state with Telegram instead of trusting the stored flag:
+  // if the token was replaced/revoked after setup (or was never valid), the
+  // bot cannot deliver messages even though bot_webhook_set may read as true.
+  let webhookInfoResult: Record<string, unknown> | null = null;
+  let tokenValid = true;
   try {
-    const webhookInfo = await getWebhookInfo(botToken);
-    return NextResponse.json({
-      configured: true,
-      username: botUsername,
-      webhook_set: botWebhookSet,
-      webhook_info: webhookInfo.result,
-    });
+    const info = await getWebhookInfo(botToken);
+    const parsed = info as { ok?: boolean; result?: Record<string, unknown> };
+    if (parsed?.ok) {
+      webhookInfoResult = parsed.result || null;
+    } else {
+      tokenValid = false;
+    }
   } catch {
-    return NextResponse.json({
-      configured: true,
-      username: botUsername,
-      webhook_set: false,
-    });
+    tokenValid = false;
   }
+
+  const actualWebhookSet = tokenValid && !!webhookInfoResult?.url;
+
+  return NextResponse.json({
+    configured: true,
+    username: botUsername,
+    webhook_set: actualWebhookSet,
+    token_valid: tokenValid,
+    webhook_info: webhookInfoResult,
+  });
 }
