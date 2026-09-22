@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Save, Bot, ExternalLink, CheckCircle, Bell } from "lucide-react";
+import { Save, Bot, ExternalLink, CheckCircle, Bell, Smartphone } from "lucide-react";
 
 interface WorkingHoursDay {
   start: string;
@@ -563,6 +563,32 @@ export default function SettingsPage() {
               <div className="p-3 bg-green-50 rounded-lg text-green-700 text-sm">
                 Ваш MAX-бот готов! Клиенты могут общаться с ним в MAX Messenger.
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Smartphone className="h-5 w-5" />
+              Мобильное приложение
+            </CardTitle>
+            <CardDescription>
+              Клиенты записываются без Telegram. iPhone: Safari → Поделиться → На экран Домой. Android: Chrome → Добавить на главный экран. Нативные оболочки: ios/ и android/.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-gray-600">Ссылка для клиентов:</p>
+            <code className="block break-all rounded-lg bg-gray-100 px-3 py-2 text-xs">
+              {`${typeof window !== "undefined" ? window.location.origin : ""}/mobile?business_id=${businessId || "…"}`}
+            </code>
+            {businessId && (
+              <a
+                href={`/mobile?business_id=${businessId}`}
+                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+              >
+                Открыть приложение <ExternalLink className="h-3 w-3" />
+              </a>
             )}
           </CardContent>
         </Card>

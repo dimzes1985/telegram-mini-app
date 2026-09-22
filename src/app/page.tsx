@@ -258,7 +258,10 @@ export default function Home() {
             <a href="#contact" className="hover:text-gray-900">Контакты</a>
           </nav>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="hidden text-sm text-gray-600 hover:text-gray-900 sm:block">
+            <Link href="/mobile" className="hidden text-sm text-gray-600 hover:text-gray-900 sm:block">
+              Приложение
+            </Link>
+            <Link href="/login" className="hidden text-sm text-gray-600 hover:text-gray-900 md:block">
               Войти
             </Link>
             <Button size="lg" render={<Link href="/login" />}>
@@ -297,8 +300,8 @@ export default function Home() {
               Начать бесплатно
               <ArrowRight className="ml-1" />
             </Button>
-            <Button size="lg" variant="outline" className="h-12 px-8 text-base" render={<Link href="#how" />}>
-              Как это работает
+            <Button size="lg" variant="outline" className="h-12 px-8 text-base" render={<Link href="/mobile" />}>
+              Открыть приложение
             </Button>
           </div>
           <p className="hero-in-delay-3 mt-4 text-sm text-gray-500">

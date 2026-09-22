@@ -40,7 +40,7 @@ export function Sidebar() {
     <aside className="w-64 bg-gray-900 text-white min-h-screen p-4">
       <div className="mb-8">
         <h1 className="text-xl font-bold">Панель управления</h1>
-        <p className="text-sm text-gray-400">Телеграм Мини-приложение</p>
+        <p className="text-sm text-gray-400">Управление бизнесом</p>
       </div>
 
       <nav className="space-y-1">

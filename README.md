@@ -113,6 +113,19 @@ curl -X GET https://your-domain.com/api/cron/renew-subscriptions \
   -H "Authorization: Bearer <CRON_SECRET>"
 ```
 
+## Мобильное приложение (iOS и Android)
+
+Клиентская запись доступна без Telegram:
+
+- веб-приложение: `/mobile` (PWA)
+- прямая ссылка бизнеса: `/mobile?business_id=<uuid>`
+- iPhone / iPad: Safari → Поделиться → На экран Домой
+- Android: Chrome → меню → Добавить на главный экран
+- исходники iOS: папка `ios/` (сборка в Xcode, см. `ios/README.md`)
+- исходники Android: папка `android/` (сборка в Android Studio, см. `android/README.md`)
+
+Готовый `.ipa` / `.apk` в этой среде не собирается — нет Xcode / Android SDK.
+
 ## Запуск
 
 ```bash
@@ -137,8 +150,9 @@ npm start
 | `/api/max/webhook/[businessId]` | Вебхук MAX-бота | `X-Max-Bot-Api-Secret` |
 | `/api/max/setup` | Подписка на обновления MAX-бота | Auth |
 | `/api/public/services` | Публичные услуги | — |
+| `/api/public/businesses` | Поиск бизнесов для мобильного клиента | rate limit |
 | `/api/timeslots` | Доступные слоты | Service role |
-| `/api/bookings` | Создание/список броней | initData + rate limit |
+| `/api/bookings` | Создание/список броней | initData / mobile + rate limit |
 | `/api/chat` | AI-ассистент | initData + rate limit + квота |
 | `/api/services` | CRUD услуг | Auth + лимит тарифа |
 | `/api/settings` | Настройки бизнеса | Auth |

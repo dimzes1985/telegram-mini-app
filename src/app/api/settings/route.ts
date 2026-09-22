@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAiUsage } from "@/lib/ai-usage";
 import { getMaxBotInfo } from "@/lib/max-bot";
 import { parseJsonBody, invalidJsonResponse } from "@/lib/http";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { getDemoState } from "@/lib/demo-store";
 
 // GET user settings
 export async function GET() {
@@ -15,6 +17,18 @@ export async function GET() {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isSupabaseConfigured()) {
+    const settings = getDemoState().settings;
+    return NextResponse.json({
+      ...settings,
+      bot_token: null,
+      bot_token_set: false,
+      max_bot_token: null,
+      max_bot_token_set: false,
+      ai_usage: { plan: settings.plan, used: 12, limit: 1000, remaining: 988 },
+    });
   }
 
   // Query basic columns first (always exist)
@@ -117,6 +131,30 @@ export async function PUT(req: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isSupabaseConfigured()) {
+    const body = await parseJsonBody(req);
+    if (body === undefined) return invalidJsonResponse();
+    const raw = body as Record<string, unknown>;
+    const settings = getDemoState().settings;
+    const keys = [
+      "business_name",
+      "business_description",
+      "business_address",
+      "business_phone",
+      "business_email",
+      "system_prompt",
+      "working_hours",
+      "telegram_notify_chat_id",
+      "max_notify_user_id",
+    ] as const;
+    for (const key of keys) {
+      if (raw[key] !== undefined) {
+        (settings as unknown as Record<string, unknown>)[key] = raw[key];
+      }
+    }
+    return NextResponse.json({ success: true, demo: true });
   }
 
   const body = await parseJsonBody(req);

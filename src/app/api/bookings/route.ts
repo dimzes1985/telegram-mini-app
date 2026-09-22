@@ -20,21 +20,42 @@ import {
   dateString,
   timeString,
 } from "@/lib/http";
+import { getClientIp, phoneDigits } from "@/lib/client-ip";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { DEMO_USER_ID, getDemoState } from "@/lib/demo-store";
+import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const createBookingSchema = z.object({
-  service_id: uuidString,
-  user_id: uuidString,
-  booking_date: dateString,
-  booking_time: timeString,
-  customer_name: z.string().trim().min(1, "Имя обязательно").max(200),
-  customer_phone: z.string().trim().max(50).nullable().optional(),
-  customer_notes: z.string().trim().max(1000).nullable().optional(),
-  initData: z.string().min(1, "initData required"),
-  platform: z.enum(["telegram", "max"]).default("telegram"),
-});
+const createBookingSchema = z
+  .object({
+    service_id: uuidString,
+    user_id: uuidString,
+    booking_date: dateString,
+    booking_time: timeString,
+    customer_name: z.string().trim().min(1, "Имя обязательно").max(200),
+    customer_phone: z.string().trim().max(50).nullable().optional(),
+    customer_notes: z.string().trim().max(1000).nullable().optional(),
+    initData: z.string().optional().default(""),
+    platform: z.enum(["telegram", "max", "mobile"]).default("telegram"),
+  })
+  .superRefine((data, ctx) => {
+    if (data.platform !== "mobile" && !data.initData) {
+      ctx.addIssue({
+        code: "custom",
+        message: "initData required",
+        path: ["initData"],
+      });
+    }
+    if (data.platform === "mobile" && phoneDigits(data.customer_phone).length < 10) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Укажите телефон",
+        path: ["customer_phone"],
+      });
+    }
+  });
 
 const updateBookingSchema = z.object({
   id: uuidString,
@@ -99,6 +120,14 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json(
+      [...getDemoState().bookings].sort((a, b) =>
+        `${b.booking_date}${b.booking_time}`.localeCompare(`${a.booking_date}${a.booking_time}`)
+      )
+    );
+  }
+
   const { data, error } = await supabase
     .from("bookings")
     .select("*, service:services(*)")
@@ -115,12 +144,44 @@ export async function GET() {
 
 // POST create a new booking (public - for Telegram customers)
 export async function POST(req: Request) {
-  const supabase = createAdminClient();
-
   const body = await parseJsonBody(req);
   if (body === undefined) return invalidJsonResponse();
   const parsed = createBookingSchema.safeParse(body);
   if (!parsed.success) return validationErrorResponse(parsed.error);
+
+  if (!isSupabaseConfigured()) {
+    const {
+      service_id,
+      booking_date,
+      booking_time,
+      customer_name,
+      customer_phone,
+      customer_notes,
+    } = parsed.data;
+    const state = getDemoState();
+    const service = state.services.find((s) => s.id === service_id);
+    if (!service) {
+      return NextResponse.json({ error: "Service not found or not available" }, { status: 404 });
+    }
+    const booking = {
+      id: randomUUID(),
+      user_id: DEMO_USER_ID,
+      service_id,
+      booking_date,
+      booking_time,
+      customer_name,
+      customer_phone: customer_phone ?? null,
+      customer_notes: customer_notes ?? null,
+      status: "pending" as const,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      service,
+    };
+    state.bookings.unshift(booking);
+    return NextResponse.json(booking, { status: 201 });
+  }
+
+  const supabase = createAdminClient();
 
   const {
     service_id,
@@ -134,51 +195,60 @@ export async function POST(req: Request) {
     platform,
   } = parsed.data;
 
-  if (!initData) {
-    return NextResponse.json(
-      { error: "initData required" },
-      { status: 401 }
-    );
-  }
-
-  // Load the business bot token(s) to verify the caller
   const { data: business } = await supabase
     .from("users")
     .select("bot_token, max_bot_token, working_hours, telegram_notify_chat_id, max_notify_user_id")
     .eq("id", user_id)
     .single();
 
-  const isMax = platform === "max";
-  const botToken = isMax ? business?.max_bot_token : business?.bot_token;
+  const isMobile = platform === "mobile";
+  let rateLimitKey = "";
 
-  if (!botToken) {
-    return NextResponse.json(
-      { error: isMax ? "Business has no MAX bot configured" : "Business has no bot configured" },
-      { status: 403 }
-    );
+  if (isMobile) {
+    const phone = phoneDigits(customer_phone);
+    const ip = getClientIp(req);
+    rateLimitKey = `bookings:mobile:${user_id}:${phone}:${ip}`;
+  } else {
+    if (!initData) {
+      return NextResponse.json(
+        { error: "initData required" },
+        { status: 401 }
+      );
+    }
+
+    const isMax = platform === "max";
+    const botToken = isMax ? business?.max_bot_token : business?.bot_token;
+
+    if (!botToken) {
+      return NextResponse.json(
+        { error: isMax ? "Business has no MAX bot configured" : "Business has no bot configured" },
+        { status: 403 }
+      );
+    }
+
+    const verification = isMax
+      ? verifyMaxInitData(initData, botToken)
+      : verifyInitData(initData, botToken);
+    if (!verification.valid) {
+      return NextResponse.json(
+        { error: verification.error || "Invalid initData" },
+        { status: 401 }
+      );
+    }
+
+    const messengerUserId = verification.user?.id;
+    if (!messengerUserId) {
+      return NextResponse.json(
+        { error: "Could not identify user" },
+        { status: 401 }
+      );
+    }
+
+    rateLimitKey = `bookings:${user_id}:${messengerUserId}`;
   }
 
-  const verification = isMax
-    ? verifyMaxInitData(initData, botToken)
-    : verifyInitData(initData, botToken);
-  if (!verification.valid) {
-    return NextResponse.json(
-      { error: verification.error || "Invalid initData" },
-      { status: 401 }
-    );
-  }
-
-  const messengerUserId = verification.user?.id;
-  if (!messengerUserId) {
-    return NextResponse.json(
-      { error: "Could not identify user" },
-      { status: 401 }
-    );
-  }
-
-  // Rate limit booking attempts per user + business
   pruneRateLimitBuckets();
-  const limit = await rateLimit(`bookings:${user_id}:${messengerUserId}`, {
+  const limit = await rateLimit(rateLimitKey, {
     windowMs: 60_000,
     max: 10,
   });
@@ -327,6 +397,16 @@ export async function PATCH(req: Request) {
   if (!parsed.success) return validationErrorResponse(parsed.error);
 
   const { id, status } = parsed.data;
+
+  if (!isSupabaseConfigured()) {
+    const booking = getDemoState().bookings.find((b) => b.id === id);
+    if (!booking) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    booking.status = status;
+    booking.updated_at = new Date().toISOString();
+    return NextResponse.json(booking);
+  }
 
   const { data, error } = await supabase
     .from("bookings")

@@ -6,6 +6,8 @@ import {
   toBookedSlots,
 } from "@/lib/slot";
 import { z } from "zod";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { demoTimeSlots } from "@/lib/demo-slots";
 
 interface WorkingHoursDay {
   start: string;
@@ -21,8 +23,6 @@ const timeslotsQuerySchema = z.object({
 
 // GET available time slots for a specific date and service
 export async function GET(req: Request) {
-  const supabase = createAdminClient();
-
   const { searchParams } = new URL(req.url);
   const parsed = timeslotsQuerySchema.safeParse({
     date: searchParams.get("date"),
@@ -38,6 +38,16 @@ export async function GET(req: Request) {
   }
 
   const { date, service_id, business_id } = parsed.data;
+
+  if (!isSupabaseConfigured()) {
+    const slots = demoTimeSlots(date, service_id);
+    if (slots === null) {
+      return NextResponse.json({ error: "Service not found" }, { status: 404 });
+    }
+    return NextResponse.json(slots);
+  }
+
+  const supabase = createAdminClient();
 
   // Get service duration
   const { data: service } = await supabase

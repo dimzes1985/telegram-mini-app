@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAiUsage } from "@/lib/ai-usage";
 import { PLANS } from "@/lib/plans";
 import { getYookassaPaymentMethod } from "@/lib/yookassa";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { getDemoState } from "@/lib/demo-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +20,25 @@ export async function GET() {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const availablePlans = Object.values(PLANS).map((p) => ({
+    id: p.id,
+    name: p.name,
+    price_monthly_rub: p.priceMonthlyRub,
+    ai_messages_per_month: p.aiMessagesPerMonth,
+    max_services: p.maxServices === Infinity ? null : p.maxServices,
+    custom_branding: p.customBranding,
+  }));
+
+  if (!isSupabaseConfigured()) {
+    const plan = getDemoState().settings.plan;
+    return NextResponse.json({
+      current_plan: plan,
+      subscription: null,
+      usage: { plan, used: 12, limit: 1000, remaining: 988 },
+      available_plans: availablePlans,
+    });
   }
 
   const admin = createAdminClient();
@@ -67,15 +88,6 @@ export async function GET() {
   } catch {
     usage = null;
   }
-
-  const availablePlans = Object.values(PLANS).map((p) => ({
-    id: p.id,
-    name: p.name,
-    price_monthly_rub: p.priceMonthlyRub,
-    ai_messages_per_month: p.aiMessagesPerMonth,
-    max_services: p.maxServices === Infinity ? null : p.maxServices,
-    custom_branding: p.customBranding,
-  }));
 
   return NextResponse.json({
     current_plan: currentPlan,

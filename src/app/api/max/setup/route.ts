@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { randomBytes } from "crypto";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   getMaxBotInfo,
   subscribeMaxWebhook,
@@ -133,6 +134,10 @@ export async function GET() {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ configured: false });
   }
 
   let maxBotToken: string | null = null;

@@ -1,9 +1,24 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { requireDemoUser } from "@/lib/demo-auth";
+
+type AuthUser = { id: string; email?: string | null };
 
 export async function createClient() {
-  const cookieStore = await cookies();
+  if (!isSupabaseConfigured()) {
+    const user = await requireDemoUser();
+    return {
+      auth: {
+        getUser: async () => ({ data: { user: user as AuthUser | null }, error: null }),
+      },
+      from() {
+        throw new Error("DEMO_MODE");
+      },
+    } as never;
+  }
 
+  const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

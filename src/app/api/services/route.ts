@@ -7,6 +7,9 @@ import {
   invalidJsonResponse,
   validationErrorResponse,
 } from "@/lib/http";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { DEMO_USER_ID, getDemoState } from "@/lib/demo-store";
+import { randomUUID } from "crypto";
 
 const createServiceSchema = z.object({
   title: z.string().trim().min(1, "Название обязательно").max(200),
@@ -25,6 +28,10 @@ export async function GET() {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json(getDemoState().services);
   }
 
   const { data, error } = await supabase
@@ -58,6 +65,23 @@ export async function POST(req: Request) {
   if (!parsed.success) return validationErrorResponse(parsed.error);
 
   const { title, description, price, duration_minutes } = parsed.data;
+
+  if (!isSupabaseConfigured()) {
+    const state = getDemoState();
+    const service = {
+      id: randomUUID(),
+      user_id: DEMO_USER_ID,
+      title,
+      description: description ?? null,
+      price,
+      duration_minutes: duration_minutes || 30,
+      active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    state.services.unshift(service);
+    return NextResponse.json(service, { status: 201 });
+  }
 
   // Enforce plan service limit
   const { data: userData } = await supabase
@@ -118,6 +142,12 @@ export async function DELETE(req: Request) {
 
   if (!id) {
     return NextResponse.json({ error: "Service ID required" }, { status: 400 });
+  }
+
+  if (!isSupabaseConfigured()) {
+    const state = getDemoState();
+    state.services = state.services.filter((s) => s.id !== id);
+    return NextResponse.json({ success: true });
   }
 
   const { error } = await supabase

@@ -317,6 +317,24 @@
   );
 }
 
+.mobile-shell {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(59, 130, 246, 0.35), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgba(147, 51, 234, 0.28), transparent 50%),
+    #0b1220;
+  color: white;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.mobile-status {
+  height: env(safe-area-inset-top, 12px);
+}
+
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .reveal,

@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, CheckCircle } from "lucide-react";
 import { bookingStatusLabel } from "@/lib/labels";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { getDemoState } from "@/lib/demo-store";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
@@ -16,11 +18,15 @@ export default async function AdminDashboard() {
     redirect("/login");
   }
 
-  // Get booking stats
-  const { data: allBookings } = await supabase
-    .from("bookings")
-    .select("status, booking_date")
-    .eq("user_id", user.id);
+  const demo = !isSupabaseConfigured();
+  const demoBookings = demo ? getDemoState().bookings : [];
+
+  const { data: allBookings } = demo
+    ? { data: demoBookings }
+    : await supabase
+        .from("bookings")
+        .select("status, booking_date")
+        .eq("user_id", user.id);
 
   const totalBookings = allBookings?.length || 0;
   const pendingBookings =
@@ -33,16 +39,23 @@ export default async function AdminDashboard() {
     allBookings?.filter((b) => b.booking_date === today).length || 0;
 
   // Get recent bookings
-  const { data: recentBookings } = await supabase
-    .from("bookings")
-    .select("*, service:services(title)")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(5);
+  const { data: recentBookings } = demo
+    ? { data: demoBookings.slice(0, 5) }
+    : await supabase
+        .from("bookings")
+        .select("*, service:services(title)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
 
   return (
     <div>
       <h1 className="text-3xl font-bold mb-8">Дашборд</h1>
+      {demo && (
+        <p className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Демо-режим: Supabase не настроен, показаны тестовые данные. Для боевого входа добавьте NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_ANON_KEY.
+        </p>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

@@ -20,6 +20,7 @@ export const metadata: Metadata = {
   title: "Slot — запись клиентов в Telegram",
   description:
     "Готовая система бронирования и ИИ-менеджер для салонов, мастерских и любых бизнесов с записью. Клиенты записываются прямо в вашем Telegram-боте, 24/7.",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

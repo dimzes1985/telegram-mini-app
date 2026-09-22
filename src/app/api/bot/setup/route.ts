@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { setWebhook, getWebhookInfo, setBotCommands } from "@/lib/telegram-bot";
 import { randomBytes } from "crypto";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 function generateSecret() {
   return randomBytes(32).toString("hex");
@@ -113,6 +114,10 @@ export async function GET() {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ configured: false });
   }
 
   // Try to get bot data - handle missing columns gracefully

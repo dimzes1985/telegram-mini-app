@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,74 +9,35 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("demo@slot.app");
+  const [password, setPassword] = useState("demo");
   const [businessName, setBusinessName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const enterAdmin = async (payload: Record<string, unknown>) => {
     setLoading(true);
     setError("");
-
     try {
-      console.log("Creating Supabase client...");
-      const supabase = createClient();
-      console.log("Attempting sign in with:", email);
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
-
-      console.log("Sign in result:", { error: error?.message, userId: data?.user?.id });
-
-      if (error) {
-        setError(error.message);
-      } else {
-        router.push("/admin");
-        router.refresh();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Не удалось войти");
+        return;
       }
-    } catch (err) {
-      console.error("Sign in error:", err);
-      setError(`Ошибка соединения: ${err instanceof Error ? err.message : "Неизвестная ошибка"}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-      console.log("Creating Supabase client...");
-      const supabase = createClient();
-      console.log("Attempting sign up with:", email);
-      
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            business_name: businessName,
-          },
-        },
-      });
-
-      console.log("Sign up result:", { error: error?.message, userId: data?.user?.id });
-
-      if (error) {
-        setError(error.message);
-      } else {
-        setError("Аккаунт создан! Проверьте почту для подтверждения, либо войдите.");
+      if (data.needs_confirmation) {
+        setError(data.message || "Проверьте почту для подтверждения.");
+        return;
       }
-    } catch (err) {
-      console.error("Sign up error:", err);
-      setError(`Ошибка соединения: ${err instanceof Error ? err.message : "Неизвестная ошибка"}`);
+      router.push("/admin");
+      router.refresh();
+    } catch {
+      setError("Нет соединения с сервером. Обновите страницу и попробуйте ещё раз.");
     } finally {
       setLoading(false);
     }
@@ -98,7 +58,13 @@ export default function LoginPage() {
             </TabsList>
 
             <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4 mt-4">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void enterAdmin({ action: "login", email, password });
+                }}
+                className="space-y-4 mt-4"
+              >
                 <div>
                   <Label htmlFor="email">Почта</Label>
                   <Input
@@ -107,7 +73,6 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    required
                   />
                 </div>
                 <div>
@@ -118,20 +83,31 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    required
                   />
                 </div>
-                {error && (
-                  <p className="text-sm text-red-500">{error}</p>
-                )}
+                {error && <p className="text-sm text-red-500">{error}</p>}
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Вход..." : "Войти"}
                 </Button>
+                <p className="text-xs text-gray-500 text-center">
+                  Сейчас база не подключена — вход откроет демо-панель Slot Studio.
+                </p>
               </form>
             </TabsContent>
 
             <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4 mt-4">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void enterAdmin({
+                    action: "signup",
+                    email,
+                    password,
+                    business_name: businessName,
+                  });
+                }}
+                className="space-y-4 mt-4"
+              >
                 <div>
                   <Label htmlFor="businessName">Название бизнеса</Label>
                   <Input
@@ -139,7 +115,6 @@ export default function LoginPage() {
                     value={businessName}
                     onChange={(e) => setBusinessName(e.target.value)}
                     placeholder="Название вашего бизнеса"
-                    required
                   />
                 </div>
                 <div>
@@ -150,7 +125,6 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    required
                   />
                 </div>
                 <div>
@@ -161,15 +135,15 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    required
                   />
                 </div>
-                {error && (
-                  <p className="text-sm text-red-500">{error}</p>
-                )}
+                {error && <p className="text-sm text-red-500">{error}</p>}
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Создание аккаунта..." : "Создать аккаунт"}
                 </Button>
+                <p className="text-xs text-gray-500 text-center">
+                  Без Supabase регистрация тоже откроет демо-панель.
+                </p>
               </form>
             </TabsContent>
           </Tabs>
