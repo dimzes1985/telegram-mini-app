@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { PLANS, type Plan } from "@/lib/plans";
 import { createYookassaPayment, isYookassaConfigured } from "@/lib/yookassa";
 import { loadOwnerNotifyTargets, notifyOwner } from "@/lib/notify-owner";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,10 @@ const CRON_SECRET = process.env.CRON_SECRET;
 // whose period has ended. Accepts requests from Vercel Cron (identified by the
 // x-vercel-cron-schedule header) or external schedulers using a Bearer CRON_SECRET.
 export async function POST(req: Request) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ processed: 0, results: [], demo: true });
+  }
+
   const isVercelCron = req.headers.has("x-vercel-cron-schedule");
 
   if (!isVercelCron) {
@@ -41,7 +46,6 @@ export async function POST(req: Request) {
     .from("subscriptions")
     .select("*")
     .in("status", ["active", "past_due"])
-    .eq("cancel_at_period_end", false)
     .lte("current_period_end", now);
 
   if (error) {
@@ -51,6 +55,18 @@ export async function POST(req: Request) {
   const results: Array<{ user_id: string; status: string; detail?: string }> = [];
 
   for (const sub of subs || []) {
+    if (sub.cancel_at_period_end) {
+      // The user asked to downgrade and the paid period is over: close the
+      // subscription and drop them back to the free plan.
+      await admin
+        .from("subscriptions")
+        .update({ status: "cancelled", updated_at: new Date().toISOString() })
+        .eq("user_id", sub.user_id);
+      await admin.from("users").update({ plan: "free" }).eq("id", sub.user_id);
+      results.push({ user_id: sub.user_id, status: "cancelled" });
+      continue;
+    }
+
     if (!sub.yookassa_payment_method_id) {
       // The period has ended but there is no saved payment method, so the
       // subscription cannot renew. Mark it past_due (instead of silently
@@ -60,6 +76,7 @@ export async function POST(req: Request) {
         .from("subscriptions")
         .update({ status: "past_due", updated_at: new Date().toISOString() })
         .eq("user_id", sub.user_id);
+      await admin.from("users").update({ plan: "free" }).eq("id", sub.user_id);
       const targets = await loadOwnerNotifyTargets(admin, sub.user_id);
       await notifyOwner(
         targets,
@@ -102,6 +119,7 @@ export async function POST(req: Request) {
         .from("subscriptions")
         .update({ status: "past_due", updated_at: new Date().toISOString() })
         .eq("user_id", sub.user_id);
+      await admin.from("users").update({ plan: "free" }).eq("id", sub.user_id);
       const targets = await loadOwnerNotifyTargets(admin, sub.user_id);
       await notifyOwner(
         targets,
@@ -116,4 +134,8 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ processed: results.length, results });
+}
+
+export async function GET(req: Request) {
+  return POST(req);
 }

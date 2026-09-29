@@ -62,6 +62,8 @@ function BillingContent() {
   const [unbinding, setUnbinding] = useState(false);
   const [unbindError, setUnbindError] = useState("");
   const [confirmUnbind, setConfirmUnbind] = useState(false);
+  const [downgrading, setDowngrading] = useState(false);
+  const [downgradeNote, setDowngradeNote] = useState("");
 
   useEffect(() => {
     if (searchParams.get("status") === "checkout") {
@@ -95,6 +97,31 @@ function BillingContent() {
       setError("Ошибка соединения");
     } finally {
       setCheckingOut(null);
+    }
+  };
+
+  const handleDowngrade = async () => {
+    setDowngrading(true);
+    setError("");
+    setDowngradeNote("");
+    try {
+      const res = await fetch("/api/billing/downgrade", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Не удалось изменить тариф");
+        return;
+      }
+      const statusRes = await fetch("/api/billing/status");
+      if (statusRes.ok) setStatus(await statusRes.json());
+      setDowngradeNote(
+        data.scheduled
+          ? "Понижение до Free запланировано на конец оплаченного периода."
+          : "Тариф изменён на Free."
+      );
+    } catch {
+      setError("Ошибка соединения");
+    } finally {
+      setDowngrading(false);
     }
   };
 
@@ -298,6 +325,26 @@ function BillingContent() {
                       "Улучшить"
                     )}
                   </Button>
+                ) : status?.subscription?.cancel_at_period_end ? (
+                  <Button variant="outline" disabled className="w-full">
+                    Понижение запланировано
+                  </Button>
+                ) : status?.subscription ? (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    disabled={downgrading}
+                    onClick={handleDowngrade}
+                  >
+                    {downgrading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Понижаем...
+                      </>
+                    ) : (
+                      "Понизить до Free"
+                    )}
+                  </Button>
                 ) : (
                   <Button variant="outline" disabled className="w-full">
                     Понижение тарифа будет доступно позже
@@ -310,6 +357,9 @@ function BillingContent() {
       </div>
 
       {error && <p className="text-sm text-red-500 mt-4">{error}</p>}
+      {downgradeNote && (
+        <p className="text-sm text-green-600 mt-4">{downgradeNote}</p>
+      )}
     </div>
   );
 }

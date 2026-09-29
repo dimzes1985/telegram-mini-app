@@ -6,6 +6,7 @@ import { PLANS } from "@/lib/plans";
 import { getYookassaPaymentMethod } from "@/lib/yookassa";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getDemoState } from "@/lib/demo-store";
+import { reconcileUserPlan, type SubscriptionRow } from "@/lib/subscription";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,31 +44,28 @@ export async function GET() {
 
   const admin = createAdminClient();
 
-  // Current plan
-  const { data: userData } = await supabase
-    .from("users")
-    .select("plan")
-    .eq("id", user.id)
-    .single();
-
-  const currentPlan = userData?.plan || "free";
-
-  // Subscription (if any)
-  let subscription = null;
+  // Reconcile `users.plan` with the subscription so an expired or cancelled
+  // subscription immediately drops the user back to the free plan.
+  let currentPlan = "free";
+  let subscription: (SubscriptionRow & {
+    payment_method?: {
+      title?: string | null;
+      card_type?: string | null;
+      last4?: string | null;
+    } | null;
+  }) | null = null;
   try {
-    const { data: subData } = await admin
-      .from("subscriptions")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const reconciled = await reconcileUserPlan(admin, user.id);
+    currentPlan = reconciled.plan;
+    subscription = reconciled.subscription;
 
     // Enrich with saved payment method details (card brand / last4)
-    if (subData?.yookassa_payment_method_id) {
+    if (subscription?.yookassa_payment_method_id) {
       try {
         const pm = await getYookassaPaymentMethod(
-          subData.yookassa_payment_method_id
+          subscription.yookassa_payment_method_id
         );
-        subData.payment_method = {
+        subscription.payment_method = {
           title: pm.title || null,
           card_type: pm.card?.card_type || null,
           last4: pm.card?.last4 || null,
@@ -76,9 +74,8 @@ export async function GET() {
         // Payment method may have been removed at YooKassa; leave details out
       }
     }
-    subscription = subData;
   } catch {
-    // table may not exist
+    // tables may not exist yet (pre-migration environment)
   }
 
   // AI usage
