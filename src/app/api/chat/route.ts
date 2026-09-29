@@ -1,4 +1,10 @@
-import { convertToModelMessages, isStepCount, streamText } from "ai";
+import {
+  convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  isStepCount,
+  streamText,
+} from "ai";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyInitData } from "@/lib/telegram-auth";
 import { verifyMaxInitData } from "@/lib/max-auth";
@@ -6,6 +12,8 @@ import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 import { getAiUsage, incrementAiUsage } from "@/lib/ai-usage";
 import { getAiModel } from "@/lib/ai";
 import { buildSystemPrompt, makeBookingTool } from "@/lib/ai-assistant";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { DEMO_USER_ID, buildDemoChatReply } from "@/lib/demo-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,11 +30,47 @@ function jsonError(message: string, status: number): Response {
   });
 }
 
+function lastUserText(messages: unknown): string {
+  if (!Array.isArray(messages) || messages.length === 0) return "";
+  const last = messages[messages.length - 1] as {
+    content?: unknown;
+    parts?: Array<{ type?: string; text?: string }>;
+  };
+  if (typeof last?.content === "string") return last.content;
+  if (Array.isArray(last?.parts)) {
+    return last.parts
+      .filter((part) => part?.type === "text" && typeof part.text === "string")
+      .map((part) => part.text as string)
+      .join("\n");
+  }
+  return "";
+}
+
+function demoChatResponse(messages: unknown): Response {
+  const text = buildDemoChatReply(lastUserText(messages));
+  const stream = createUIMessageStream({
+    execute: ({ writer }) => {
+      const id = "demo";
+      writer.write({ type: "text-start", id });
+      writer.write({ type: "text-delta", id, delta: text });
+      writer.write({ type: "text-end", id });
+    },
+  });
+  return createUIMessageStreamResponse({ stream });
+}
+
 export async function POST(req: Request) {
   const { messages, businessId, initData, platform = "telegram" } = await req.json();
 
   if (!businessId) {
     return jsonError("businessId required", 400);
+  }
+
+  if (!isSupabaseConfigured()) {
+    if (businessId !== DEMO_USER_ID) {
+      return jsonError("Business not found", 404);
+    }
+    return demoChatResponse(messages);
   }
 
   if (!initData) {

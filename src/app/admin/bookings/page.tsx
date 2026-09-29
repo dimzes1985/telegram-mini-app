@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar, List } from "lucide-react";
 import { CalendarView } from "./calendar-page";
 import { BookingsListView } from "./bookings-list";
 
 export default function BookingsPage() {
+  return (
+    <Suspense fallback={<div className="text-gray-500">Загрузка...</div>}>
+      <BookingsPageContent />
+    </Suspense>
+  );
+}
+
+function BookingsPageContent() {
   const [view, setView] = useState<"list" | "calendar">("list");
 
   return (

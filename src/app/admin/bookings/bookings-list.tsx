@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,13 +14,20 @@ const FILTERS = [
   { key: "all", label: "Все" },
   { key: "pending", label: "Ожидают" },
   { key: "confirmed", label: "Подтверждены" },
+  { key: "today", label: "Сегодня" },
   { key: "cancelled", label: "Отменены" },
 ];
 
+const FILTER_KEYS = new Set(FILTERS.map((f) => f.key));
+
 export function BookingsListView() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const rawFilter = searchParams.get("filter");
+  const filter =
+    rawFilter && FILTER_KEYS.has(rawFilter) ? rawFilter : "all";
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<string>("all");
 
   const fetchBookings = async () => {
     const res = await fetch("/api/bookings");
@@ -48,10 +56,17 @@ export function BookingsListView() {
     fetchBookings();
   };
 
+  const setFilterTab = (key: string) => {
+    router.replace(`/admin/bookings?filter=${key}`, { scroll: false });
+  };
+
+  const today = new Date().toISOString().split("T")[0];
   const filteredBookings =
     filter === "all"
       ? bookings
-      : bookings.filter((b) => b.status === filter);
+      : filter === "today"
+        ? bookings.filter((b) => b.booking_date === today)
+        : bookings.filter((b) => b.status === filter);
 
   return (
     <div>
@@ -61,7 +76,7 @@ export function BookingsListView() {
           <Button
             key={key}
             variant={filter === key ? "default" : "outline"}
-            onClick={() => setFilter(key)}
+            onClick={() => setFilterTab(key)}
           >
             {label}
           </Button>

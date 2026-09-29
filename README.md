@@ -4,36 +4,40 @@ Mini App для бизнеса (например, библиотеки, сало
 
 - просматривать услуги и рабочие часы в Telegram и MAX Messenger;
 - бронировать слоты в режиме реального времени;
-- общаться с бизнесом через AI-ассистента на базе OpenAI (GPT-4o-mini).
+- общаться с бизнесом через AI-ассистента (OpenAI-совместимый API, по умолчанию DeepSeek).
 
 Владелец бизнеса управляет всем через веб-интерфейс: услуги, бронирования, расписание, бизнес-инфо, тарифы и оплату.
+
+Без переменных Supabase приложение стартует в **демо-режиме**: вход `demo@slot.app` / любой пароль открывает панель Slot Studio с тестовыми услугами и записями.
 
 ## Стек
 
 - **Next.js 16** (App Router), React 19, TypeScript, Tailwind CSS
-- **Supabase** (PostgreSQL, Auth, RLS)
-- **OpenAI API** (`gpt-4o-mini`) — AI-ассистент в чате
+- **Supabase** (PostgreSQL, Auth, RLS); без ключей работает in-memory демо
+- **AI SDK** — OpenAI-совместимый чат (`AI_BASE_URL` / `AI_MODEL`, по умолчанию DeepSeek `deepseek-chat`)
 - **ЮKassa** — приём подписок (Free / Pro / Business)
 - **Telegram Bot API** — вебхук с `secret_token` на каждый бизнес
 - **MAX Bot API** — вебхук с `X-Max-Bot-Api-Secret` на каждый бизнес
 
 ## Тарифы
 
-| Тариф | Цена | AI-сообщений/мес | Услуг | Брендинг |
-|-------|------|------------------|-------|----------|
+| Тариф | Цена | AI-сообщений/мес | Услуг | Свой брендинг |
+|-------|------|------------------|-------|---------------|
 | Free | 0 ₽ | 50 | 3 | — |
-| Pro | 1490 ₽/мес | 1000 | 50 | — |
+| Pro | 1490 ₽/мес | 1000 | 50 | + |
 | Business | 4990 ₽/мес | 10000 | ∞ | + |
 
 ## Настройка
 
 ### 1. Переменные окружения
 
-Скопируйте `.env.example` в `.env` и заполните значения:
+Скопируйте `.env.example` в `.env.local` и заполните значения:
 
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
+
+Пустые `NEXT_PUBLIC_SUPABASE_URL` и `NEXT_PUBLIC_SUPABASE_ANON_KEY` включают демо-режим.
 
 | Переменная | Назначение |
 |------------|------------|
@@ -41,15 +45,23 @@ cp .env.example .env
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon (публичный) ключ Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role ключ (обходит RLS, только на сервере) |
 | `NEXT_PUBLIC_APP_URL` | Публичный https-URL деплоя (не localhost) |
-| `OPENAI_API_KEY` | Ключ OpenAI для AI-ассистента |
+| `AI_API_KEY` | Ключ AI-провайдера |
+| `AI_BASE_URL` | Базовый URL OpenAI-совместимого API (по умолчанию `https://api.deepseek.com/v1`) |
+| `AI_MODEL` | Модель (по умолчанию `deepseek-chat`) |
+| `OPENAI_API_KEY` | Запасной ключ, если `AI_API_KEY` не задан |
 | `YOOKASSA_SHOP_ID` | Идентификатор магазина ЮKassa |
 | `YOOKASSA_SECRET_KEY` | Секретный ключ ЮKassa (доступ к API) |
+| `YOOKASSA_ALLOW_IP_BYPASS` | `1` только для локальной проверки вебхука ЮKassa |
 | `CRON_SECRET` | Секрет для cron-эндпоинта продления подписок |
+| `UPSTASH_REDIS_REST_URL` | Опциональный Redis для rate limit |
+| `UPSTASH_REDIS_REST_TOKEN` | Токен Upstash Redis |
+| `CONTACT_BUSINESS_ID` | UUID бизнеса, чей MAX-бот принимает форму с лендинга |
+| `CONTACT_MAX_USER_ID` | MAX user id получателя сообщений с лендинга |
 
 ### 2. База данных
 
 1. Создайте проект в [Supabase](https://supabase.com).
-2. В SQL Editor выполните содержимое [`schema.sql`](./schema.sql) — создаются таблицы `users`, `services`, `bookings`, `ai_usage`, `subscriptions`, `payments`, RLS-политики и функции.
+2. В SQL Editor выполните содержимое `schema.sql` — создаются таблицы `users`, `services`, `bookings`, `ai_usage`, `subscriptions`, `payments`, RLS-политики и функции.
 3. Включите Supabase Auth (email-пароль) и Telegram-авторизацию, если используется.
 4. Включите **Realtime** для таблицы `bookings` — обновления расписания мгновенно отражаются у клиентов.
 
@@ -88,7 +100,7 @@ https://your-domain.com/api/max/webhook/{businessId}
 ### 5. ЮKassa
 
 1. Зарегистрируйте магазин в ЮKassa и получите `shop_id` и секретный ключ.
-2. Укажите в `.env` переменные `YOOKASSA_SHOP_ID` и `YOOKASSA_SECRET_KEY`.
+2. Укажите в `.env.local` переменные `YOOKASSA_SHOP_ID` и `YOOKASSA_SECRET_KEY`.
 3. В кабинете ЮKassa настройте HTTP-уведомления на URL:
 
 ```
@@ -151,9 +163,11 @@ npm start
 | `/api/max/setup` | Подписка на обновления MAX-бота | Auth |
 | `/api/public/services` | Публичные услуги | — |
 | `/api/public/businesses` | Поиск бизнесов для мобильного клиента | rate limit |
-| `/api/timeslots` | Доступные слоты | Service role |
+| `/api/public/business-info` | Публичное инфо бизнеса | — |
+| `/api/timeslots` | Доступные слоты | Service role / демо |
 | `/api/bookings` | Создание/список броней | initData / mobile + rate limit |
-| `/api/chat` | AI-ассистент | initData + rate limit + квота |
+| `/api/chat` | AI-ассистент | initData + rate limit + квота; в демо — локальные ответы |
+| `/api/contact` | Форма с лендинга | rate limit; в демо сохраняется в память |
 | `/api/services` | CRUD услуг | Auth + лимит тарифа |
 | `/api/settings` | Настройки бизнеса | Auth |
 | `/api/billing/checkout` | Создание платежа ЮKassa | Auth |
@@ -166,7 +180,7 @@ npm start
 
 - **RLS**: клиентские политики ограничены собственными строками; чувствительные данные читаются серверными роутами через service role.
 - **initData**: верификация Telegram/MAX initData (HMAC-SHA256) для публичных мутаций.
-- **Rate limiting**: in-memory лимитер (20 запросов/мин для чата, 10/мин для бронирования).
+- **Rate limiting**: in-memory лимитер (20 запросов/мин для чата, 10/мин для бронирования); при наличии Upstash — Redis.
 - **AI-квота**: месячный лимит сообщений зависит от тарифа, учитывается через `ai_usage`.
 
 ## Миграции

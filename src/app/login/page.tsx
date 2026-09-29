@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,27 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("demo@slot.app");
-  const [password, setPassword] = useState("demo");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [demoMode, setDemoMode] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    fetch("/api/auth/demo")
+      .then((res) => res.json())
+      .then((data) => {
+        const demo = Boolean(data.demo_available);
+        setDemoMode(demo);
+        if (demo) {
+          setEmail("demo@slot.app");
+          setPassword("demo");
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const enterAdmin = async (payload: Record<string, unknown>) => {
     setLoading(true);
@@ -89,9 +104,11 @@ export default function LoginPage() {
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Вход..." : "Войти"}
                 </Button>
-                <p className="text-xs text-gray-500 text-center">
-                  Сейчас база не подключена — вход откроет демо-панель Slot Studio.
-                </p>
+                {demoMode && (
+                  <p className="text-xs text-gray-500 text-center">
+                    Сейчас база не подключена — вход откроет демо-панель Slot Studio.
+                  </p>
+                )}
               </form>
             </TabsContent>
 
@@ -141,9 +158,11 @@ export default function LoginPage() {
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Создание аккаунта..." : "Создать аккаунт"}
                 </Button>
-                <p className="text-xs text-gray-500 text-center">
-                  Без Supabase регистрация тоже откроет демо-панель.
-                </p>
+                {demoMode && (
+                  <p className="text-xs text-gray-500 text-center">
+                    Без Supabase регистрация тоже откроет демо-панель.
+                  </p>
+                )}
               </form>
             </TabsContent>
           </Tabs>

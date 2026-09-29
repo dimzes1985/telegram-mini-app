@@ -8,6 +8,8 @@ import {
   invalidJsonResponse,
   validationErrorResponse,
 } from "@/lib/http";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { addDemoContact } from "@/lib/demo-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,6 +54,11 @@ export async function POST(req: Request) {
   if (!parsed.success) return validationErrorResponse(parsed.error);
 
   const { name, contact, message } = parsed.data;
+
+  if (!isSupabaseConfigured()) {
+    addDemoContact({ name, contact, message });
+    return NextResponse.json({ ok: true, demo: true });
+  }
 
   const admin = createAdminClient();
   const { data: owner, error } = await admin

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadOwnerNotifyTargets, notifyOwner } from "@/lib/notify-owner";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,6 +35,20 @@ export async function POST() {
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({
+        success: true,
+        demo: true,
+        channels: [
+          {
+            channel: "telegram",
+            status: "skipped",
+            reason: "Демо-режим: бот не подключён",
+          },
+        ],
+      });
     }
 
     const targets = await loadOwnerNotifyTargets(createAdminClient(), user.id);

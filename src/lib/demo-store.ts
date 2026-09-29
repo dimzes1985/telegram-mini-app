@@ -4,6 +4,13 @@ import type { Booking, Service } from "@/types";
 export const DEMO_USER_ID = "00000000-0000-4000-8000-000000000001";
 export const DEMO_COOKIE = "slot_demo";
 
+export interface DemoContact {
+  name: string;
+  contact?: string;
+  message: string;
+  created_at: string;
+}
+
 export interface WorkingHoursDay {
   start: string;
   end: string;
@@ -86,6 +93,7 @@ interface DemoState {
   settings: DemoSettings;
   services: Service[];
   bookings: Booking[];
+  contacts: DemoContact[];
 }
 
 declare global {
@@ -114,6 +122,7 @@ function createState(): DemoState {
       max_notify_user_id: null,
     },
     services: [seedServiceA, seedServiceB, seedServiceC],
+    contacts: [],
     bookings: [
       {
         id: randomUUID(),
@@ -151,11 +160,58 @@ export function getDemoState(): DemoState {
   if (!globalThis.__slotDemoStore) {
     globalThis.__slotDemoStore = createState();
   }
-  return globalThis.__slotDemoStore;
+  const state = globalThis.__slotDemoStore;
+  if (!state.contacts) {
+    state.contacts = [];
+  }
+  return state;
 }
 
 export function demoUser() {
   return { id: DEMO_USER_ID, email: "demo@slot.app" };
+}
+
+export function addDemoContact(contact: Omit<DemoContact, "created_at">) {
+  const entry: DemoContact = {
+    ...contact,
+    created_at: new Date().toISOString(),
+  };
+  getDemoState().contacts.unshift(entry);
+  return entry;
+}
+
+const DAY_LABELS: Record<string, string> = {
+  monday: "Пн",
+  tuesday: "Вт",
+  wednesday: "Ср",
+  thursday: "Чт",
+  friday: "Пт",
+  saturday: "Сб",
+  sunday: "Вс",
+};
+
+export function buildDemoChatReply(userText: string): string {
+  const { settings, services } = getDemoState();
+  const catalog = services
+    .filter((s) => s.active)
+    .map((s) => `• ${s.title} — ${s.price} ₽ (${s.duration_minutes} мин)`)
+    .join("\n");
+  const hours = Object.entries(settings.working_hours)
+    .filter(([, day]) => day.enabled)
+    .map(([name, day]) => `${DAY_LABELS[name] || name}: ${day.start}–${day.end}`)
+    .join(", ");
+  const text = userText.trim().toLowerCase();
+
+  if (/запис|слот|время|свободн/.test(text)) {
+    return `Это демо-чат Slot Studio. Живую запись удобнее оформить в календаре мини-приложения.\n\nУслуги:\n${catalog}\n\nЧасы: ${hours || "по записи"}.`;
+  }
+  if (/цен|прайс|услуг|стрижк|маникюр|консультац/.test(text)) {
+    return `Прайс ${settings.business_name}:\n${catalog}\n\nАдрес: ${settings.business_address}. Телефон: ${settings.business_phone}.`;
+  }
+  if (/час|график|работ|когда открыт|режим/.test(text)) {
+    return `${settings.business_name}, ${settings.business_address}.\nРабочие часы: ${hours || "уточните у администратора"}.`;
+  }
+  return `Здравствуйте! Я демо-ассистент ${settings.business_name}. База и ИИ-провайдер не подключены, поэтому ответы тестовые.\n\nУслуги:\n${catalog}\n\nМогу рассказать о ценах и часах работы. Чтобы записаться, откройте вкладку записи.`;
 }
 
 export function listDemoBusinesses(q?: string) {

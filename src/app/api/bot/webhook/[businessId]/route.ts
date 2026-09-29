@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   sendTelegramMessage,
   sendTelegramMessageChunked,
@@ -19,6 +20,10 @@ export async function POST(
   { params }: { params: Promise<{ businessId: string }> }
 ) {
   const { businessId } = await params;
+
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ ok: false, demo: true }, { status: 503 });
+  }
 
   // Verify the secret token that Telegram sends in every webhook request
   const secretToken = req.headers.get("X-Telegram-Bot-Api-Secret-Token");

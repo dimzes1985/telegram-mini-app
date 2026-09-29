@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   sendMaxMessage,
   answerMaxCallback,
@@ -29,6 +30,10 @@ export async function POST(
   { params }: { params: Promise<{ businessId: string }> }
 ) {
   const { businessId } = await params;
+
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ ok: false, demo: true }, { status: 503 });
+  }
 
   // Verify the secret that MAX sends in the webhook header
   const secret = req.headers.get("X-Max-Bot-Api-Secret");

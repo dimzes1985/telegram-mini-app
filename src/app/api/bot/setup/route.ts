@@ -21,6 +21,13 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json(
+      { error: "В демо-режиме Telegram-бот не подключается. Укажите токен после настройки Supabase." },
+      { status: 400 }
+    );
+  }
+
   // Get bot token - handle missing columns gracefully
   let botToken: string | null = null;
   try {

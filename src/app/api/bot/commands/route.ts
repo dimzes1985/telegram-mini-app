@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { setBotCommands } from "@/lib/telegram-bot";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 // POST - Set bot commands for the authenticated user's bot
 export async function POST() {
@@ -12,6 +13,13 @@ export async function POST() {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json(
+      { error: "В демо-режиме команды бота недоступны" },
+      { status: 400 }
+    );
   }
 
   // Find bot token for the current user

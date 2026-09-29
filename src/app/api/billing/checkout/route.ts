@@ -8,6 +8,7 @@ import {
   invalidJsonResponse,
   validationErrorResponse,
 } from "@/lib/http";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +27,13 @@ export async function POST(req: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json(
+      { error: "В демо-режиме оплата недоступна. Подключите Supabase и ЮKassa." },
+      { status: 503 }
+    );
   }
 
   if (!isYookassaConfigured()) {

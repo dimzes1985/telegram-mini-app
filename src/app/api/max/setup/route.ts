@@ -26,6 +26,13 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json(
+      { error: "В демо-режиме MAX-бот не подключается. Укажите токен после настройки Supabase." },
+      { status: 400 }
+    );
+  }
+
   const admin = createAdminClient();
 
   let maxBotToken: string | null = null;
