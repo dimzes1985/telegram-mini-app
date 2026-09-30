@@ -44,6 +44,14 @@ const FREE_PLAN: PlanInfo = {
   custom_branding: false,
 };
 
+const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
+  active: "активна",
+  trialing: "пробный период",
+  past_due: "ожидает оплаты",
+  cancelled: "отменена",
+  expired: "истекла",
+};
+
 export default function BillingPage() {
   return (
     <Suspense fallback={<div>Загрузка...</div>}>
@@ -159,6 +167,9 @@ function BillingContent() {
       : [FREE_PLAN]
     : [FREE_PLAN];
   const currentPlan = status?.current_plan || "free";
+  const subscription = status?.subscription ?? null;
+  const subscriptionActive =
+    subscription?.status === "active" || subscription?.status === "trialing";
 
   return (
     <div>
@@ -167,15 +178,17 @@ function BillingContent() {
         Управление подпиской и лимитами тарифа.
       </p>
 
-      {status?.subscription && (
+      {subscription && subscriptionActive && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Текущая подписка
-              <Badge className="capitalize">{status.subscription.status}</Badge>
+              <Badge className="capitalize">
+                {SUBSCRIPTION_STATUS_LABELS[subscription.status] || subscription.status}
+              </Badge>
             </CardTitle>
             <CardDescription>
-              {status.subscription.cancel_at_period_end
+              {subscription.cancel_at_period_end
                 ? "Подписка будет отменена в конце текущего периода."
                 : "Автоматически продлевается каждый месяц."}
             </CardDescription>
@@ -183,15 +196,17 @@ function BillingContent() {
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">Тариф</span>
-              <span className="font-medium capitalize">{status.subscription.plan}</span>
+              <span className="font-medium capitalize">{subscription.plan}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Действует до</span>
-              <span className="font-medium">
-                {new Date(status.subscription.current_period_end).toLocaleDateString("ru-RU")}
-              </span>
-            </div>
-            {status.usage && (
+            {subscription.current_period_end && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Действует до</span>
+                <span className="font-medium">
+                  {new Date(subscription.current_period_end).toLocaleDateString("ru-RU")}
+                </span>
+              </div>
+            )}
+            {status?.usage && (
               <div className="flex justify-between">
                 <span className="text-gray-500">Использовано AI-сообщений</span>
                 <span className="font-medium">
@@ -199,17 +214,17 @@ function BillingContent() {
                 </span>
               </div>
             )}
-            {status.subscription.yookassa_payment_method_id && (
+            {subscription.yookassa_payment_method_id && (
               <div className="p-3 bg-gray-50 rounded-lg mt-4">
                 <p className="text-sm font-medium flex items-center gap-2">
                   <CreditCard className="h-4 w-4 text-gray-500" />
                   Привязана карта
                 </p>
-                {status.subscription.payment_method?.title && (
+                {subscription.payment_method?.title && (
                   <p className="text-sm text-gray-600 mt-1">
-                    {status.subscription.payment_method.title}
-                    {status.subscription.payment_method.last4 &&
-                      ` •••• ${status.subscription.payment_method.last4}`}
+                    {subscription.payment_method.title}
+                    {subscription.payment_method.last4 &&
+                      ` •••• ${subscription.payment_method.last4}`}
                   </p>
                 )}
                 {!confirmUnbind ? (
@@ -257,7 +272,7 @@ function BillingContent() {
                 )}
               </div>
             )}
-            {!status.subscription.cancel_at_period_end && (
+            {!subscription.cancel_at_period_end && (
               <Button
                 variant="outline"
                 className="mt-4"
@@ -269,6 +284,37 @@ function BillingContent() {
               >
                 Отменить подписку
               </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {subscription && !subscriptionActive && (
+        <Card className="mb-8 border-gray-200 bg-gray-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Подписка не активна
+              <Badge variant="secondary" className="capitalize">
+                {SUBSCRIPTION_STATUS_LABELS[subscription.status] || subscription.status}
+              </Badge>
+            </CardTitle>
+            <CardDescription>
+              Тариф понижен до Free. Услуги, записи и настройки сохранены.
+              Оформите тариф заново, чтобы вернуть прежние лимиты.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Предыдущий тариф</span>
+              <span className="font-medium capitalize">{subscription.plan}</span>
+            </div>
+            {subscription.current_period_end && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Был активен до</span>
+                <span className="font-medium">
+                  {new Date(subscription.current_period_end).toLocaleDateString("ru-RU")}
+                </span>
+              </div>
             )}
           </CardContent>
         </Card>
