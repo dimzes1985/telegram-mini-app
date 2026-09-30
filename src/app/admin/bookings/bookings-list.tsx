@@ -71,7 +71,7 @@ export function BookingsListView() {
   return (
     <div>
       {/* Filter Tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex flex-wrap gap-2 mb-6">
         {FILTERS.map(({ key, label }) => (
           <Button
             key={key}
@@ -95,8 +95,8 @@ export function BookingsListView() {
         <div className="space-y-4">
           {filteredBookings.map((booking) => (
             <Card key={booking.id}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h3 className="font-semibold">{booking.customer_name}</h3>
                     <p className="text-sm text-gray-600">
@@ -114,7 +114,7 @@ export function BookingsListView() {
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                     <Badge
                       variant={
                         booking.status === "confirmed"
@@ -127,7 +127,7 @@ export function BookingsListView() {
                       {bookingStatusLabel(booking.status)}
                     </Badge>
                     {booking.status === "pending" && (
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           size="sm"
                           onClick={() =>

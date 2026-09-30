@@ -55,9 +55,12 @@ export function ServiceForm({ service, onSave, onDelete, trigger }: ServiceFormP
 
   return (
     <>
-      <div onClick={() => setOpen(true)} className="cursor-pointer">
+      <div
+        onClick={() => setOpen(true)}
+        className={trigger ? "cursor-pointer" : "w-full cursor-pointer sm:w-auto"}
+      >
         {trigger || (
-          <Button>
+          <Button className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Добавить услугу
           </Button>

@@ -51,7 +51,7 @@ export default async function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8">Дашборд</h1>
+      <h1 className="text-2xl font-bold mb-6 sm:text-3xl sm:mb-8">Дашборд</h1>
       {demo && (
         <p className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           Демо-режим: Supabase не настроен, показаны тестовые данные. Для боевого входа добавьте NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_ANON_KEY.
@@ -59,17 +59,17 @@ export default async function AdminDashboard() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 gap-3 mb-6 sm:gap-4 sm:mb-8 lg:grid-cols-4 lg:gap-6">
         <Link href="/admin/bookings?filter=all" className="block">
           <Card className="h-full transition-shadow hover:shadow-md">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-xs font-medium text-gray-600 sm:text-sm">
                 Всего бронирований
               </CardTitle>
-              <Calendar className="h-5 w-5 text-gray-400" />
+              <Calendar className="h-4 w-4 text-gray-400 sm:h-5 sm:w-5" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{totalBookings}</div>
+              <div className="text-2xl font-bold sm:text-3xl">{totalBookings}</div>
             </CardContent>
           </Card>
         </Link>
@@ -77,13 +77,13 @@ export default async function AdminDashboard() {
         <Link href="/admin/bookings?filter=pending" className="block">
           <Card className="h-full transition-shadow hover:shadow-md">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-xs font-medium text-gray-600 sm:text-sm">
                 Ожидают
               </CardTitle>
-              <Clock className="h-5 w-5 text-yellow-500" />
+              <Clock className="h-4 w-4 text-yellow-500 sm:h-5 sm:w-5" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-yellow-600">
+              <div className="text-2xl font-bold text-yellow-600 sm:text-3xl">
                 {pendingBookings}
               </div>
             </CardContent>
@@ -93,13 +93,13 @@ export default async function AdminDashboard() {
         <Link href="/admin/bookings?filter=confirmed" className="block">
           <Card className="h-full transition-shadow hover:shadow-md">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-xs font-medium text-gray-600 sm:text-sm">
                 Подтверждено
               </CardTitle>
-              <CheckCircle className="h-5 w-5 text-green-500" />
+              <CheckCircle className="h-4 w-4 text-green-500 sm:h-5 sm:w-5" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-green-600">
+              <div className="text-2xl font-bold text-green-600 sm:text-3xl">
                 {confirmedBookings}
               </div>
             </CardContent>
@@ -109,13 +109,13 @@ export default async function AdminDashboard() {
         <Link href="/admin/bookings?filter=today" className="block">
           <Card className="h-full transition-shadow hover:shadow-md">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
+              <CardTitle className="text-xs font-medium text-gray-600 sm:text-sm">
                 На сегодня
               </CardTitle>
-              <Calendar className="h-5 w-5 text-blue-500" />
+              <Calendar className="h-4 w-4 text-blue-500 sm:h-5 sm:w-5" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-blue-600">
+              <div className="text-2xl font-bold text-blue-600 sm:text-3xl">
                 {todayBookings}
               </div>
             </CardContent>
@@ -134,7 +134,7 @@ export default async function AdminDashboard() {
               {recentBookings.map((booking) => (
                 <div
                   key={booking.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                  className="flex flex-col gap-2 p-4 bg-gray-50 rounded-lg sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div>
                     <p className="font-medium">{booking.customer_name}</p>

@@ -14,7 +14,6 @@ interface PlanInfo {
   price_monthly_rub: number;
   ai_messages_per_month: number;
   max_services: number | null;
-  custom_branding: boolean;
 }
 
 interface BillingStatus {
@@ -41,7 +40,6 @@ const FREE_PLAN: PlanInfo = {
   price_monthly_rub: 0,
   ai_messages_per_month: 50,
   max_services: 3,
-  custom_branding: false,
 };
 
 const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
@@ -173,8 +171,8 @@ function BillingContent() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-2">Оплата</h1>
-      <p className="text-gray-500 mb-8">
+      <h1 className="text-2xl font-bold mb-2 sm:text-3xl">Оплата</h1>
+      <p className="text-gray-500 mb-6 sm:mb-8">
         Управление подпиской и лимитами тарифа.
       </p>
 
@@ -320,7 +318,7 @@ function BillingContent() {
         </Card>
       )}
 
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-3">
         {plans.map((plan) => {
           const isCurrent = plan.id === currentPlan;
           const isPaid = plan.id !== "free";
@@ -346,10 +344,6 @@ function BillingContent() {
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-green-500" />
                     {plan.ai_messages_per_month.toLocaleString("ru-RU")} AI-сообщений в месяц
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-500" />
-                    {plan.custom_branding ? "Свой брендинг" : "Стандартный брендинг"}
                   </li>
                 </ul>
                 {isCurrent ? (

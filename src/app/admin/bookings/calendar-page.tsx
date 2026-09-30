@@ -53,7 +53,7 @@ export function CalendarView() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8">Календарь</h1>
+      <h1 className="text-2xl font-bold mb-6 sm:text-3xl sm:mb-8">Календарь</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar Grid */}
@@ -79,7 +79,7 @@ export function CalendarView() {
             {/* Day headers */}
             <div className="grid grid-cols-7 gap-1 mb-2">
               {WEEKDAY_HEADERS.map((day) => (
-                <div key={day} className="text-center text-sm font-medium text-gray-500 py-2">
+                <div key={day} className="text-center text-xs font-medium text-gray-500 py-2 sm:text-sm">
                   {day}
                 </div>
               ))}
@@ -97,7 +97,7 @@ export function CalendarView() {
                   <button
                     key={day.toISOString()}
                     onClick={() => setSelectedDate(day)}
-                    className={`relative p-2 min-h-[80px] text-left rounded-lg border transition-colors ${
+                    className={`relative p-1 min-h-[54px] text-left rounded-lg border transition-colors sm:p-2 sm:min-h-[80px] ${
                       !isCurrentMonth
                         ? "bg-gray-50 text-gray-400"
                         : isSelected
@@ -105,7 +105,7 @@ export function CalendarView() {
                           : "hover:bg-gray-50"
                     } ${isToday ? "ring-2 ring-blue-500" : ""}`}
                   >
-                    <span className={`text-sm ${isToday ? "font-bold" : ""}`}>
+                    <span className={`text-xs sm:text-sm ${isToday ? "font-bold" : ""}`}>
                       {format(day, "d")}
                     </span>
                     {dayBookings.length > 0 && (
@@ -113,7 +113,7 @@ export function CalendarView() {
                         {dayBookings.slice(0, 2).map((booking) => (
                           <div
                             key={booking.id}
-                            className={`text-xs truncate px-1 py-0.5 rounded ${
+                            className={`text-[10px] sm:text-xs truncate px-1 py-0.5 rounded ${
                               booking.status === "confirmed"
                                 ? "bg-green-100 text-green-700"
                                 : booking.status === "cancelled"

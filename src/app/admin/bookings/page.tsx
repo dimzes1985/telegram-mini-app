@@ -19,12 +19,13 @@ function BookingsPageContent() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">Бронирования</h1>
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between sm:mb-8">
+        <h1 className="text-2xl font-bold sm:text-3xl">Бронирования</h1>
         <div className="flex gap-2">
           <Button
             variant={view === "list" ? "default" : "outline"}
             onClick={() => setView("list")}
+            className="flex-1 sm:flex-none"
           >
             <List className="h-4 w-4 mr-2" />
             Список
@@ -32,6 +33,7 @@ function BookingsPageContent() {
           <Button
             variant={view === "calendar" ? "default" : "outline"}
             onClick={() => setView("calendar")}
+            className="flex-1 sm:flex-none"
           >
             <Calendar className="h-4 w-4 mr-2" />
             Календарь

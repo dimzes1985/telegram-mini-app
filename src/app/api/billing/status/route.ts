@@ -29,7 +29,6 @@ export async function GET() {
     price_monthly_rub: p.priceMonthlyRub,
     ai_messages_per_month: p.aiMessagesPerMonth,
     max_services: p.maxServices === Infinity ? null : p.maxServices,
-    custom_branding: p.customBranding,
   }));
 
   if (!isSupabaseConfigured()) {

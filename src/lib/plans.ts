@@ -7,7 +7,6 @@ export interface PlanConfig {
   aiMessagesPerMonth: number;
   maxServices: number;
   maxStaff: number;
-  customBranding: boolean;
 }
 
 export const PLANS: Record<Plan, PlanConfig> = {
@@ -18,7 +17,6 @@ export const PLANS: Record<Plan, PlanConfig> = {
     aiMessagesPerMonth: 50,
     maxServices: 3,
     maxStaff: 1,
-    customBranding: false,
   },
   pro: {
     id: "pro",
@@ -27,7 +25,6 @@ export const PLANS: Record<Plan, PlanConfig> = {
     aiMessagesPerMonth: 1000,
     maxServices: 50,
     maxStaff: 3,
-    customBranding: true,
   },
   business: {
     id: "business",
@@ -36,7 +33,6 @@ export const PLANS: Record<Plan, PlanConfig> = {
     aiMessagesPerMonth: 10000,
     maxServices: Infinity,
     maxStaff: Infinity,
-    customBranding: true,
   },
 };
 

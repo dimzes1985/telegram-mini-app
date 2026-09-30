@@ -316,7 +316,7 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8">Настройки</h1>
+      <h1 className="text-2xl font-bold mb-6 sm:text-3xl sm:mb-8">Настройки</h1>
 
       <div className="max-w-2xl space-y-6">
         <Card>
@@ -393,7 +393,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="botToken">Токен бота</Label>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Input
                   id="botToken"
                   type="password"
@@ -402,7 +402,7 @@ export default function SettingsPage() {
                   placeholder={botTokenSet ? "••••••••" : "Введите токен от @BotFather"}
                 />
                 {botTokenSet && (
-                  <Badge variant="secondary" className="whitespace-nowrap">
+                  <Badge variant="secondary" className="self-start whitespace-nowrap">
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Установлен
                   </Badge>
@@ -489,7 +489,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="maxBotToken">Токен бота</Label>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <Input
                   id="maxBotToken"
                   type="password"
@@ -498,7 +498,7 @@ export default function SettingsPage() {
                   placeholder={maxBotTokenSet ? "••••••••" : "Введите токен доступа MAX-бота"}
                 />
                 {maxBotTokenSet && (
-                  <Badge variant="secondary" className="whitespace-nowrap">
+                  <Badge variant="secondary" className="self-start whitespace-nowrap">
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Установлен
                   </Badge>
@@ -678,8 +678,8 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {DAYS.map((day) => (
-              <div key={day} className="flex items-center gap-4">
-                <div className="w-24">
+              <div key={day} className="flex flex-wrap items-center gap-2 sm:gap-4">
+                <div className="w-24 shrink-0">
                   <Label className="text-sm font-medium">{DAY_LABELS[day]}</Label>
                 </div>
                 <Switch
@@ -692,14 +692,14 @@ export default function SettingsPage() {
                       type="time"
                       value={workingHours[day]?.start || "09:00"}
                       onChange={(e) => updateDay(day, "start", e.target.value)}
-                      className="w-32"
+                      className="w-28 sm:w-32"
                     />
                     <span className="text-gray-500">до</span>
                     <Input
                       type="time"
                       value={workingHours[day]?.end || "18:00"}
                       onChange={(e) => updateDay(day, "end", e.target.value)}
-                      className="w-32"
+                      className="w-28 sm:w-32"
                     />
                   </div>
                 )}

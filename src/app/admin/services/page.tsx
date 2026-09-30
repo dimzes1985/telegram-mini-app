@@ -58,8 +58,8 @@ export default function ServicesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">Услуги</h1>
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between sm:mb-8">
+        <h1 className="text-2xl font-bold sm:text-3xl">Услуги</h1>
         <ServiceForm onSave={handleCreate} />
       </div>
 
@@ -75,8 +75,8 @@ export default function ServicesPage() {
         <div className="grid gap-4">
           {services.map((service) => (
             <Card key={service.id}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h3 className="text-lg font-semibold">{service.title}</h3>
                     {service.description && (
@@ -89,7 +89,7 @@ export default function ServicesPage() {
                       <span>{service.duration_minutes} мин</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 self-start">
                     <Badge variant={service.active ? "default" : "secondary"}>
                       {service.active ? "Активна" : "Неактивна"}
                     </Badge>
