@@ -46,7 +46,7 @@ export default function MiniApp({ businessId }: { businessId: string | null }) {
         }}
       >
         <h1 className="text-lg font-bold text-center">
-          {user ? `Привет, ${user.first_name}!` : "Запись"}
+          {user?.first_name ? `Привет, ${user.first_name}!` : "Запись"}
         </h1>
       </header>
 
