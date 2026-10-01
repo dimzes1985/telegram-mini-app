@@ -10,7 +10,8 @@ import { useMessenger } from "@/lib/messenger";
 import { bookingEndTime } from "@/lib/slot";
 import { ArrowLeft, Check } from "lucide-react";
 import { Service, TimeSlot } from "@/types";
-import { format, startOfDay } from "date-fns";
+import { addDays, format, startOfDay } from "date-fns";
+import { MAX_BOOKING_DAYS_AHEAD } from "@/lib/booking-rules";
 import { ru } from "date-fns/locale";
 
 interface BookingFlowProps {
@@ -95,12 +96,17 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
   useEffect(() => {
     if (selectedDate && selectedService) {
       const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const controller = new AbortController();
       fetch(
-        `/api/timeslots?date=${dateStr}&service_id=${selectedService.id}&business_id=${businessId}`
+        `/api/timeslots?date=${dateStr}&service_id=${selectedService.id}&business_id=${businessId}`,
+        { signal: controller.signal }
       )
-        .then((res) => res.json())
-        .then(setTimeSlots)
-        .catch(() => setTimeSlots([]));
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => setTimeSlots(Array.isArray(data) ? data : []))
+        .catch((e) => {
+          if ((e as Error).name !== "AbortError") setTimeSlots([]);
+        });
+      return () => controller.abort();
     }
   }, [selectedDate, selectedService, businessId]);
 
@@ -227,7 +233,8 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
             selected={selectedDate}
             onSelect={(value) => setSelectedDate(value)}
             disabled={(date: Date) =>
-              date < startOfDay(new Date()) || !isWorkingDay(date)
+              date < startOfDay(new Date()) ||
+              date > addDays(startOfDay(new Date()), MAX_BOOKING_DAYS_AHEAD) || !isWorkingDay(date)
             }
             className="rounded-md border"
           />

@@ -40,7 +40,9 @@ async function upstashPipeline(
     throw new Error("Upstash Redis is not configured");
   }
 
-  const response = await fetch(url, {
+  // Multiple commands must go to the /pipeline endpoint; the root endpoint
+  // accepts a single command only.
+  const response = await fetch(`${url.replace(/\/+$/, "")}/pipeline`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(commands),
@@ -51,15 +53,16 @@ async function upstashPipeline(
     throw new Error(`Upstash error ${response.status}`);
   }
 
-  const data = (await response.json()) as {
-    result?: unknown;
-    results?: unknown[];
-    error?: string;
-  };
-  if (data.error) {
-    throw new Error(data.error);
+  // Pipeline response: [{ result: ... } | { error: "..." }, ...]
+  const data = (await response.json()) as Array<{ result?: unknown; error?: string }>;
+  if (!Array.isArray(data)) {
+    throw new Error("Unexpected Upstash pipeline response");
   }
-  return (data.results ?? data.result) as unknown[];
+  const failed = data.find((item) => item?.error);
+  if (failed?.error) {
+    throw new Error(failed.error);
+  }
+  return data.map((item) => item?.result);
 }
 
 // Exact shared rate limiting backed by Redis. Uses INCR + EXPIRE NX so a key

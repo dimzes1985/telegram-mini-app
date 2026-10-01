@@ -1,5 +1,4 @@
 import {
-  convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
   isStepCount,
@@ -59,8 +58,56 @@ function demoChatResponse(messages: unknown): Response {
   return createUIMessageStreamResponse({ stream });
 }
 
+// Only the last few turns are sent to the model; older context is not needed
+// and an unbounded history would let a client burn the AI budget.
+const MAX_HISTORY_MESSAGES = 20;
+const MAX_MESSAGE_CHARS = 2000;
+
+// Keeps only user/assistant text from the client-provided history so a client
+// cannot inject system prompts or fake tool results.
+function sanitizeMessages(raw: unknown): Array<{ role: "user" | "assistant"; content: string }> {
+  if (!Array.isArray(raw)) return [];
+  const result: Array<{ role: "user" | "assistant"; content: string }> = [];
+  for (const item of raw.slice(-MAX_HISTORY_MESSAGES)) {
+    const msg = item as {
+      role?: unknown;
+      content?: unknown;
+      parts?: Array<{ type?: string; text?: unknown }>;
+    };
+    if (msg?.role !== "user" && msg?.role !== "assistant") continue;
+    let text = "";
+    if (typeof msg.content === "string") {
+      text = msg.content;
+    } else if (Array.isArray(msg.parts)) {
+      text = msg.parts
+        .filter((p) => p?.type === "text" && typeof p.text === "string")
+        .map((p) => p.text as string)
+        .join("\n");
+    }
+    text = text.trim().slice(0, MAX_MESSAGE_CHARS);
+    if (text) result.push({ role: msg.role, content: text });
+  }
+  // The conversation must end with the customer's message.
+  while (result.length && result[result.length - 1].role !== "user") result.pop();
+  return result;
+}
+
 export async function POST(req: Request) {
-  const { messages, businessId, initData, platform = "telegram" } = await req.json();
+  let body: {
+    messages?: unknown;
+    businessId?: unknown;
+    initData?: unknown;
+    platform?: unknown;
+  };
+  try {
+    body = await req.json();
+  } catch {
+    return jsonError("Invalid JSON body", 400);
+  }
+  const { messages } = body;
+  const businessId = typeof body.businessId === "string" ? body.businessId : "";
+  const initData = typeof body.initData === "string" ? body.initData : "";
+  const platform = body.platform === "max" ? "max" : "telegram";
 
   if (!businessId) {
     return jsonError("businessId required", 400);
@@ -141,18 +188,23 @@ export async function POST(req: Request) {
 
   const systemPrompt = buildSystemPrompt(user, services ?? []);
 
-  // The client (useChat + DefaultChatTransport) sends messages in UIMessage
-  // format ({ id, role, parts }). streamText expects ModelMessage[] (with
-  // `content`), so convert when parts are present.
-  const modelMessages = Array.isArray(messages?.[0]?.parts)
-    ? await convertToModelMessages(messages)
-    : messages;
+  // The client (useChat) sends UIMessage objects; reduce them to plain
+  // user/assistant text turns.
+  const modelMessages = sanitizeMessages(messages);
+  if (modelMessages.length === 0) {
+    return jsonError("Empty message", 400);
+  }
 
   const result = streamText({
     model: getAiModel(),
     system: systemPrompt,
     messages: modelMessages,
-    tools: { create_booking: makeBookingTool(supabase, businessId) },
+    tools: {
+      create_booking: makeBookingTool(supabase, businessId, {
+        source: isMax ? "max" : "telegram",
+        messengerId: String(messengerUserId),
+      }),
+    },
     stopWhen: isStepCount(MAX_REPLY_STEPS),
     onFinish: async () => {
       // Count the assistant response toward the monthly quota

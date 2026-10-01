@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { format, startOfDay } from "date-fns";
+import { addDays, format, startOfDay } from "date-fns";
+import { MAX_BOOKING_DAYS_AHEAD } from "@/lib/booking-rules";
 import { ru } from "date-fns/locale";
 import {
   ArrowLeft,
@@ -166,12 +167,17 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
   useEffect(() => {
     if (!selectedDate || !selectedService || !business) return;
     const dateStr = format(selectedDate, "yyyy-MM-dd");
+    const controller = new AbortController();
     fetch(
-      `/api/timeslots?date=${dateStr}&service_id=${selectedService.id}&business_id=${business.id}`
+      `/api/timeslots?date=${dateStr}&service_id=${selectedService.id}&business_id=${business.id}`,
+      { signal: controller.signal }
     )
-      .then((res) => res.json())
-      .then(setTimeSlots)
-      .catch(() => setTimeSlots([]));
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setTimeSlots(Array.isArray(data) ? data : []))
+      .catch((e) => {
+        if ((e as Error).name !== "AbortError") setTimeSlots([]);
+      });
+    return () => controller.abort();
   }, [selectedDate, selectedService, business]);
 
   const isWorkingDay = (date: Date) => {
@@ -223,7 +229,6 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
     setSelectedService(null);
     setSelectedDate(undefined);
     setSelectedTime(null);
-    setTimeSlots([]);
     setError(null);
     setScreen("services");
   }
@@ -410,7 +415,8 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
               mode="single"
               selected={selectedDate}
               onSelect={(value) => setSelectedDate(value)}
-              disabled={(date: Date) => date < startOfDay(new Date()) || !isWorkingDay(date)}
+              disabled={(date: Date) => date < startOfDay(new Date()) ||
+              date > addDays(startOfDay(new Date()), MAX_BOOKING_DAYS_AHEAD) || !isWorkingDay(date)}
             />
           </div>
           {selectedDate && (

@@ -8,9 +8,15 @@ import { notifyOwner } from "@/lib/notify-owner";
 import {
   bookingEndTime,
   findOverlappingSlot,
-  timeToMinutes,
   toBookedSlots,
 } from "@/lib/slot";
+import { checkSlotRules, SLOT_RULE_MESSAGES, type WorkingHours } from "@/lib/booking-rules";
+import {
+  hasTooManyActiveBookings,
+  TOO_MANY_BOOKINGS_MESSAGE,
+  type CustomerIdentity,
+} from "@/lib/booking-guard";
+import { insertBooking } from "@/lib/insert-booking";
 import { z } from "zod";
 import {
   parseJsonBody,
@@ -51,7 +57,7 @@ const createBookingSchema = z
     if (data.platform === "mobile" && phoneDigits(data.customer_phone).length < 10) {
       ctx.addIssue({
         code: "custom",
-        message: "Укажите телефон",
+        message: "Укажите номер телефона полностью",
         path: ["customer_phone"],
       });
     }
@@ -75,6 +81,20 @@ interface BookingNotificationInput {
   customerName: string;
   customerPhone?: string | null;
   customerNotes?: string | null;
+  source?: string;
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+  telegram: "Telegram",
+  max: "MAX",
+  mobile: "Веб-приложение",
+  ai: "AI-ассистент",
+};
+
+// Formats "2026-08-24" as "24.08.2026".
+function formatRuDate(isoDate: string): string {
+  const [y, m, d] = isoDate.split("-");
+  return `${d}.${m}.${y}`;
 }
 
 // Builds the new-booking message and sends it to the owner's channels.
@@ -90,6 +110,7 @@ async function notifyBookingOwner(input: BookingNotificationInput): Promise<void
     customerName,
     customerPhone,
     customerNotes,
+    source,
   } = input;
 
   const lines = [
@@ -103,6 +124,9 @@ async function notifyBookingOwner(input: BookingNotificationInput): Promise<void
   ];
   if (customerNotes) {
     lines.push(`📝 Комментарий: ${customerNotes}`);
+  }
+  if (source && SOURCE_LABELS[source]) {
+    lines.push(`📲 Источник: ${SOURCE_LABELS[source]}`);
   }
 
   await notifyOwner(business, lines.join("\n"));
@@ -142,7 +166,7 @@ export async function GET() {
   return NextResponse.json(data);
 }
 
-// POST create a new booking (public - for Telegram customers)
+// POST create a new booking (public - for Telegram / MAX / mobile customers)
 export async function POST(req: Request) {
   const body = await parseJsonBody(req);
   if (body === undefined) return invalidJsonResponse();
@@ -161,7 +185,16 @@ export async function POST(req: Request) {
     const state = getDemoState();
     const service = state.services.find((s) => s.id === service_id);
     if (!service) {
-      return NextResponse.json({ error: "Service not found or not available" }, { status: 404 });
+      return NextResponse.json({ error: "Услуга не найдена или недоступна" }, { status: 404 });
+    }
+    const ruleError = checkSlotRules({
+      date: booking_date,
+      time: booking_time,
+      durationMinutes: service.duration_minutes ?? 30,
+      workingHours: state.settings.working_hours as WorkingHours,
+    });
+    if (ruleError) {
+      return NextResponse.json({ error: SLOT_RULE_MESSAGES[ruleError] }, { status: 400 });
     }
     const booking = {
       id: randomUUID(),
@@ -195,33 +228,47 @@ export async function POST(req: Request) {
     platform,
   } = parsed.data;
 
+  // Cheap per-IP limit first, before touching the database.
+  const ip = getClientIp(req);
+  pruneRateLimitBuckets();
+  const ipLimit = await rateLimit(`bookings:ip:${ip}`, {
+    windowMs: 10 * 60_000,
+    max: 10,
+  });
+  if (!ipLimit.allowed) {
+    return NextResponse.json(
+      { error: "Слишком много попыток. Попробуйте позже." },
+      { status: 429 }
+    );
+  }
+
   const { data: business } = await supabase
     .from("users")
     .select("bot_token, max_bot_token, working_hours, telegram_notify_chat_id, max_notify_user_id")
     .eq("id", user_id)
-    .single();
+    .maybeSingle();
+
+  if (!business) {
+    return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
+  }
 
   const isMobile = platform === "mobile";
-  let rateLimitKey = "";
+  let identity: CustomerIdentity;
+  let rateLimitKey: string;
 
   if (isMobile) {
     const phone = phoneDigits(customer_phone);
-    const ip = getClientIp(req);
-    rateLimitKey = `bookings:mobile:${user_id}:${phone}:${ip}`;
+    identity = { kind: "phone", phoneDigits: phone };
+    // Keyed by business + IP only: rotating fake phone numbers must not
+    // reset the limit.
+    rateLimitKey = `bookings:mobile:${user_id}:${ip}`;
   } else {
-    if (!initData) {
-      return NextResponse.json(
-        { error: "initData required" },
-        { status: 401 }
-      );
-    }
-
     const isMax = platform === "max";
-    const botToken = isMax ? business?.max_bot_token : business?.bot_token;
+    const botToken = isMax ? business.max_bot_token : business.bot_token;
 
     if (!botToken) {
       return NextResponse.json(
-        { error: isMax ? "Business has no MAX bot configured" : "Business has no bot configured" },
+        { error: isMax ? "У бизнеса не подключён MAX-бот" : "У бизнеса не подключён Telegram-бот" },
         { status: 403 }
       );
     }
@@ -231,7 +278,7 @@ export async function POST(req: Request) {
       : verifyInitData(initData, botToken);
     if (!verification.valid) {
       return NextResponse.json(
-        { error: verification.error || "Invalid initData" },
+        { error: "Сессия устарела. Закройте и снова откройте приложение." },
         { status: 401 }
       );
     }
@@ -239,22 +286,26 @@ export async function POST(req: Request) {
     const messengerUserId = verification.user?.id;
     if (!messengerUserId) {
       return NextResponse.json(
-        { error: "Could not identify user" },
+        { error: "Не удалось определить пользователя" },
         { status: 401 }
       );
     }
 
-    rateLimitKey = `bookings:${user_id}:${messengerUserId}`;
+    identity = {
+      kind: "messenger",
+      source: isMax ? "max" : "telegram",
+      messengerId: String(messengerUserId),
+    };
+    rateLimitKey = `bookings:${user_id}:${platform}:${messengerUserId}`;
   }
 
-  pruneRateLimitBuckets();
   const limit = await rateLimit(rateLimitKey, {
-    windowMs: 60_000,
-    max: 10,
+    windowMs: 60 * 60_000,
+    max: isMobile ? 3 : 10,
   });
   if (!limit.allowed) {
     return NextResponse.json(
-      { error: "Too many booking attempts, please slow down" },
+      { error: "Слишком много попыток записи. Попробуйте позже." },
       { status: 429 }
     );
   }
@@ -266,54 +317,34 @@ export async function POST(req: Request) {
     .eq("id", service_id)
     .eq("user_id", user_id)
     .eq("active", true)
-    .single();
+    .maybeSingle();
 
   if (!service) {
     return NextResponse.json(
-      { error: "Service not found or not available" },
+      { error: "Услуга не найдена или недоступна" },
       { status: 404 }
     );
   }
 
   const durationMinutes = service.duration_minutes ?? 30;
-  const startMinutes = timeToMinutes(booking_time);
-  if (startMinutes === null) {
-    return NextResponse.json(
-      { error: "Invalid time format" },
-      { status: 400 }
-    );
+
+  // Date/time rules in the business time zone: not in the past, not too far
+  // ahead, inside working hours for the whole service duration.
+  const ruleError = checkSlotRules({
+    date: booking_date,
+    time: booking_time,
+    durationMinutes,
+    workingHours: business.working_hours as WorkingHours | null,
+  });
+  if (ruleError) {
+    return NextResponse.json({ error: SLOT_RULE_MESSAGES[ruleError] }, { status: 400 });
   }
+
+  if (await hasTooManyActiveBookings(supabase, user_id, identity)) {
+    return NextResponse.json({ error: TOO_MANY_BOOKINGS_MESSAGE }, { status: 429 });
+  }
+
   const endTime = bookingEndTime(booking_time, durationMinutes);
-
-  // Validate the requested time fits within the business working hours,
-  // including the full service duration (start and end inside the work day).
-  if (business?.working_hours) {
-    const dateObj = new Date(booking_date + "T00:00:00");
-    const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-    const dayName = dayNames[dateObj.getDay()];
-    const dayHours = (business.working_hours as Record<string, { start: string; end: string; enabled: boolean }>)[dayName];
-
-    if (!dayHours?.enabled) {
-      return NextResponse.json(
-        { error: "Business is closed on this day" },
-        { status: 400 }
-      );
-    }
-
-    const dayStart = timeToMinutes(dayHours.start);
-    const dayEnd = timeToMinutes(dayHours.end);
-    if (
-      dayStart === null ||
-      dayEnd === null ||
-      startMinutes < dayStart ||
-      startMinutes + durationMinutes > dayEnd
-    ) {
-      return NextResponse.json(
-        { error: "Requested time is outside working hours" },
-        { status: 400 }
-      );
-    }
-  }
 
   // Check for bookings that overlap the requested interval. A service takes
   // `duration_minutes`, so a booking blocks the whole [start, start+duration)
@@ -325,29 +356,31 @@ export async function POST(req: Request) {
     .eq("booking_date", booking_date)
     .neq("status", "cancelled");
 
-  const existingSlots = toBookedSlots(existingBookings);
-
-  if (findOverlappingSlot(existingSlots, booking_time, durationMinutes)) {
+  if (findOverlappingSlot(toBookedSlots(existingBookings), booking_time, durationMinutes)) {
     return NextResponse.json(
-      { error: "This time slot is already booked" },
+      { error: "Это время уже занято. Выберите другое." },
       { status: 409 }
     );
   }
 
-  const { data, error } = await supabase
-    .from("bookings")
-    .insert({
+  const { data, error } = await insertBooking(
+    supabase,
+    {
       service_id,
       user_id,
       booking_date,
       booking_time,
       customer_name,
-      customer_phone,
-      customer_notes,
+      customer_phone: customer_phone || null,
+      customer_notes: customer_notes || null,
       status: "pending",
-    })
-    .select("*, service:services(*)")
-    .single();
+    },
+    {
+      source: platform,
+      customer_messenger_id: identity.kind === "messenger" ? identity.messengerId : null,
+    },
+    "*, service:services(*)"
+  );
 
   if (error) {
     // The unique index on (user_id, booking_date, booking_time) handles the
@@ -356,24 +389,29 @@ export async function POST(req: Request) {
     // SELECT -> INSERT race above cannot cause a double booking.
     if (error.code === "23505" || error.code === "23P01") {
       return NextResponse.json(
-        { error: "This time slot is already booked" },
+        { error: "Это время уже занято. Выберите другое." },
         { status: 409 }
       );
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Booking insert failed:", error);
+    return NextResponse.json(
+      { error: "Не удалось создать запись, попробуйте ещё раз." },
+      { status: 500 }
+    );
   }
 
   // Notify the owner (awaited for delivery; notifyOwner never rejects, so a
   // failed notification cannot fail the booking)
-  if (data && business) {
+  if (data) {
     await notifyBookingOwner({
       business,
       serviceTitle: service.title,
-      bookingDate: booking_date,
+      bookingDate: formatRuDate(booking_date),
       bookingTime: `${booking_time}–${endTime}`,
       customerName: customer_name,
       customerPhone: customer_phone,
       customerNotes: customer_notes,
+      source: platform,
     });
   }
 
@@ -423,7 +461,7 @@ export async function PATCH(req: Request) {
     // the slot was taken while the booking was cancelled.
     if (error.code === "23505" || error.code === "23P01") {
       return NextResponse.json(
-        { error: "This time slot is already booked" },
+        { error: "Это время уже занято другой записью" },
         { status: 409 }
       );
     }
