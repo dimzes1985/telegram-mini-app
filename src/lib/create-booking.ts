@@ -164,8 +164,10 @@ export async function createBookingForBusiness(
     .single();
 
   if (error) {
-    // The unique index on (user_id, booking_date, booking_time) and the
-    // overlap trigger both guard races between the check and the insert.
+    // The unique index on (user_id, booking_date, booking_time) handles the
+    // identical-start case (23505); the bookings_no_overlap exclusion
+    // constraint atomically rejects overlapping intervals (23P01), so the
+    // SELECT -> INSERT race above cannot cause a double booking.
     if (error.code === "23505" || error.code === "23P01") {
       return {
         ok: false,

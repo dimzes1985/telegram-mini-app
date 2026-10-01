@@ -6,6 +6,11 @@
 -- date, guarding the race between the API-level conflict check and the insert
 -- (the exact-start unique index still handles the "same minute" case).
 --
+-- NOTE: superseded by migration-slot-exclusion-constraint.sql. This BEFORE
+-- INSERT trigger only sees COMMITTED rows, so under concurrency it does not
+-- prevent double booking. Apply this file first, then the exclusion-constraint
+-- migration, which drops this trigger and enforces non-overlap atomically.
+--
 -- Run in the Supabase SQL editor.
 -- ============================================
 

@@ -6,6 +6,9 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Needed for the GiST equality operator class on uuid (booking overlap guard)
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
 -- ============================================
 -- Business Owners (extends Supabase auth.users)
 -- ============================================
@@ -87,6 +90,10 @@ CREATE TABLE bookings (
   customer_phone TEXT,
   customer_notes TEXT,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'cancelled')),
+  -- Materialized booked interval [booked_start, booked_end), derived from
+  -- booking_date/time and the service duration by trg_bookings_set_interval.
+  booked_start TIMESTAMP,
+  booked_end TIMESTAMP,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -121,66 +128,56 @@ CREATE INDEX idx_chat_messages_conversation
 
 -- Prevent double-booking the same time slot. The API route checks for
 -- conflicts before inserting, but without this constraint two concurrent
--- requests could both pass the check and occupy the same slot.
+-- requests could both pass the check and occupy the same slot. This index
+-- covers the identical-start case; the exclusion constraint below covers
+-- overlapping intervals with different starts atomically.
 CREATE UNIQUE INDEX idx_bookings_slot_unique
   ON bookings (user_id, booking_date, booking_time)
   WHERE status <> 'cancelled';
 
--- Prevent overlapping bookings: a service takes duration_minutes, so a booking
--- blocks the whole [booking_time, booking_time + duration) window, not just its
--- starting minute. The trigger rejects an insert whose interval overlaps any
--- non-cancelled booking for the same business and date (errcode 23P01).
-CREATE OR REPLACE FUNCTION prevent_overlapping_booking()
+-- Materialize each booking's interval from booking_date/time + service
+-- duration. Runs BEFORE INSERT/UPDATE so the exclusion constraint sees the
+-- values. A snapshot is intentional: later changes to a service duration do
+-- not retroactively move existing bookings.
+CREATE OR REPLACE FUNCTION bookings_set_interval()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  new_duration INT;
-  new_start INT;
-  new_end INT;
-  existing_start INT;
-  existing_end INT;
-  rec RECORD;
+  dur INT;
 BEGIN
-  SELECT duration_minutes INTO new_duration
+  SELECT duration_minutes INTO dur
   FROM services
   WHERE id = NEW.service_id;
 
-  IF new_duration IS NULL OR new_duration <= 0 THEN
-    new_duration := 30;
+  IF dur IS NULL OR dur <= 0 THEN
+    dur := 30;
   END IF;
 
-  new_start := EXTRACT(HOUR FROM NEW.booking_time) * 60
-             + EXTRACT(MINUTE FROM NEW.booking_time);
-  new_end := new_start + new_duration;
-
-  FOR rec IN
-    SELECT b.booking_time, s.duration_minutes
-    FROM bookings b
-    JOIN services s ON s.id = b.service_id
-    WHERE b.user_id = NEW.user_id
-      AND b.booking_date = NEW.booking_date
-      AND b.status <> 'cancelled'
-      AND b.id IS DISTINCT FROM NEW.id
-  LOOP
-    existing_start := EXTRACT(HOUR FROM rec.booking_time) * 60
-                    + EXTRACT(MINUTE FROM rec.booking_time);
-    existing_end := existing_start + COALESCE(rec.duration_minutes, 30);
-
-    IF new_start < existing_end AND existing_start < new_end THEN
-      RAISE EXCEPTION 'time slot already booked'
-        USING ERRCODE = '23P01';
-    END IF;
-  END LOOP;
-
+  NEW.booked_start := NEW.booking_date + NEW.booking_time;
+  NEW.booked_end   := NEW.booked_start + make_interval(mins => dur);
   RETURN NEW;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_prevent_overlapping_booking ON bookings;
-CREATE TRIGGER trg_prevent_overlapping_booking
-  BEFORE INSERT ON bookings
-  FOR EACH ROW EXECUTE FUNCTION prevent_overlapping_booking();
+CREATE TRIGGER trg_bookings_set_interval
+  BEFORE INSERT OR UPDATE ON bookings
+  FOR EACH ROW EXECUTE FUNCTION bookings_set_interval();
+
+ALTER TABLE bookings
+  ALTER COLUMN booked_start SET NOT NULL,
+  ALTER COLUMN booked_end SET NOT NULL;
+
+-- Atomic overlap guard: at most one active booking may hold a given
+-- [booked_start, booked_end) range per business. Enforced by the GiST index,
+-- so it is correct even for concurrent inserts (errcode 23P01).
+ALTER TABLE bookings
+  ADD CONSTRAINT bookings_no_overlap
+  EXCLUDE USING gist (
+    user_id WITH =,
+    tsrange(booked_start, booked_end, '[)') WITH &&
+  )
+  WHERE (status <> 'cancelled');
 
 -- ============================================
 -- AI usage metering (monthly message quota per business)

@@ -4,6 +4,7 @@ import { PLANS, type Plan } from "@/lib/plans";
 import { createYookassaPayment, isYookassaConfigured } from "@/lib/yookassa";
 import { loadOwnerNotifyTargets, notifyOwner } from "@/lib/notify-owner";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { isCronRequestAuthorized } from "@/lib/cron-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,27 +13,25 @@ const CRON_SECRET = process.env.CRON_SECRET;
 
 // POST /api/cron/renew-subscriptions
 // Call this endpoint periodically (e.g. daily) to charge active subscriptions
-// whose period has ended. Accepts requests from Vercel Cron (identified by the
-// x-vercel-cron-schedule header) or external schedulers using a Bearer CRON_SECRET.
+// whose period has ended. Every request must present
+// `Authorization: Bearer <CRON_SECRET>`. Vercel Cron adds this header
+// automatically when CRON_SECRET is configured; external schedulers send it
+// explicitly. We deliberately do not trust the x-vercel-cron-schedule header,
+// since external clients can forge it.
 export async function POST(req: Request) {
-  if (!isSupabaseConfigured()) {
-    return NextResponse.json({ processed: 0, results: [], demo: true });
+  if (!CRON_SECRET) {
+    return NextResponse.json(
+      { error: "CRON_SECRET not configured" },
+      { status: 500 }
+    );
   }
 
-  const isVercelCron = req.headers.has("x-vercel-cron-schedule");
+  if (!isCronRequestAuthorized(req.headers.get("authorization"), CRON_SECRET)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-  if (!isVercelCron) {
-    if (!CRON_SECRET) {
-      return NextResponse.json(
-        { error: "CRON_SECRET not configured" },
-        { status: 500 }
-      );
-    }
-
-    const authHeader = req.headers.get("authorization");
-    if (authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ processed: 0, results: [], demo: true });
   }
 
   if (!isYookassaConfigured()) {

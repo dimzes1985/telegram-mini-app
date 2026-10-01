@@ -350,9 +350,10 @@ export async function POST(req: Request) {
     .single();
 
   if (error) {
-    // The unique index on (user_id, booking_date, booking_time) and the
-    // overlap trigger both guard the race between the conflict check and the
-    // insert (23505 exact start, 23P01 overlapping interval).
+    // The unique index on (user_id, booking_date, booking_time) handles the
+    // identical-start case (23505); the bookings_no_overlap exclusion
+    // constraint atomically rejects overlapping intervals (23P01), so the
+    // SELECT -> INSERT race above cannot cause a double booking.
     if (error.code === "23505" || error.code === "23P01") {
       return NextResponse.json(
         { error: "This time slot is already booked" },
@@ -417,6 +418,15 @@ export async function PATCH(req: Request) {
     .single();
 
   if (error) {
+    // Re-activating a booking (cancelled -> pending/confirmed) is checked
+    // against the bookings_no_overlap exclusion constraint; a conflict means
+    // the slot was taken while the booking was cancelled.
+    if (error.code === "23505" || error.code === "23P01") {
+      return NextResponse.json(
+        { error: "This time slot is already booked" },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

@@ -125,6 +125,8 @@ curl -X GET https://your-domain.com/api/cron/renew-subscriptions \
   -H "Authorization: Bearer <CRON_SECRET>"
 ```
 
+Все запросы (включая вызовы Vercel Cron) обязаны содержать `Authorization: Bearer <CRON_SECRET>`. Vercel Cron добавляет этот заголовок автоматически, если переменная `CRON_SECRET` задана в проекте. Заголовок `x-vercel-cron-schedule` не используется для авторизации, так как его может подставить любой внешний клиент.
+
 ## Мобильное приложение (iOS и Android)
 
 Клиентская запись доступна без Telegram:
@@ -187,3 +189,5 @@ npm start
 
 - `migration.sql` — расширение базовой схемы (вебхуки ботов, тарифы, AI-квота).
 - `migration-max.sql` — поддержка MAX-бота (`max_bot_token`, `max_bot_username`, `max_bot_webhook_secret`, `max_bot_webhook_set`).
+- `migration-slot-overlap-trigger.sql` — проверка пересечения слотов триггером (BEFORE INSERT); недостаточна при параллельных запросах, применять до следующей.
+- `migration-slot-exclusion-constraint.sql` — атомарная защита от двойного бронирования через ограничение `EXCLUDE USING gist` по `(user_id, tsrange(booked_start, booked_end))`; обязательна для продакшена (требует расширение `btree_gist`).

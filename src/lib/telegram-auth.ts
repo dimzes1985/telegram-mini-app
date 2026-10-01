@@ -48,6 +48,10 @@ export interface VerifyResult {
   error?: string;
 }
 
+// Allow a small clock skew so initData signed a few seconds "ahead" of the
+// server clock is not rejected, while still blocking absurd future timestamps.
+const MAX_FUTURE_SKEW_SECONDS = 60;
+
 // Verifies Telegram WebApp initData against the business bot token.
 export function verifyInitData(
   initData: string,
@@ -64,10 +68,22 @@ export function verifyInitData(
     return { valid: false, error: "Missing hash in initData" };
   }
 
-  // Reject stale initData to prevent replay attacks
+  // Reject stale initData to prevent replay attacks. auth_date is covered by
+  // the signature, so a valid hash guarantees the timestamp is authentic; the
+  // freshness window bounds how long a captured initData string stays usable.
+  const nowSeconds = Math.floor(Date.now() / 1000);
   const authDate = Number(params.auth_date);
-  if (!authDate || Date.now() / 1000 - authDate > maxAgeSeconds) {
+
+  if (!Number.isFinite(authDate) || authDate <= 0) {
+    return { valid: false, error: "Missing or invalid auth_date" };
+  }
+
+  if (nowSeconds - authDate > maxAgeSeconds) {
     return { valid: false, error: "initData is expired" };
+  }
+
+  if (authDate - nowSeconds > MAX_FUTURE_SKEW_SECONDS) {
+    return { valid: false, error: "initData auth_date is in the future" };
   }
 
   const expectedHash = computeHash(initData, botToken);

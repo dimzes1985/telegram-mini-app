@@ -113,6 +113,21 @@ export async function POST(req: Request) {
   const admin = createAdminClient();
 
   if (notification.event === "payment.succeeded") {
+    // Idempotency guard #1: ЮKassa delivers notifications at-least-once, so the
+    // same payment can arrive several times. If it is already recorded as
+    // succeeded, acknowledge and skip all side effects (otherwise a renewal
+    // would extend the period again).
+    const { data: processedPayment } = await admin
+      .from("payments")
+      .select("id")
+      .eq("yookassa_payment_id", paymentId)
+      .eq("status", "succeeded")
+      .maybeSingle();
+
+    if (processedPayment) {
+      return NextResponse.json({ ok: true, idempotent: true });
+    }
+
     // Only use the payment method for future recurring charges if YooKassa
     // actually saved it (save_payment_method). For one-time fallback payments
     // the method must be ignored, otherwise the renewal cron would try to
@@ -126,7 +141,9 @@ export async function POST(req: Request) {
     // so a delayed webhook never shortens or drifts the subscription period.
     const { data: existingSub } = await admin
       .from("subscriptions")
-      .select("id, current_period_end, yookassa_payment_method_id")
+      .select(
+        "id, current_period_end, yookassa_payment_method_id, yookassa_payment_id"
+      )
       .eq("user_id", userId)
       .single();
 
@@ -138,39 +155,50 @@ export async function POST(req: Request) {
       existingSub?.yookassa_payment_method_id ??
       null;
 
-    const now = new Date();
-    const periodStart =
-      metadata.type === "subscription_renewal" && existingSub?.current_period_end
-        ? new Date(existingSub.current_period_end)
-        : now;
-    const periodEnd = new Date(periodStart);
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    // Idempotency guard #2: the subscription already points at this payment, so
+    // its period has already been extended. Do not extend it twice, but still
+    // reconcile the payment ledger and the user plan below.
+    const alreadyExtended = existingSub?.yookassa_payment_id === paymentId;
 
-    // Upsert subscription and get its id so payments can be linked to it
-    const { data: subscription } = await admin
-      .from("subscriptions")
-      .upsert(
-        {
-          user_id: userId,
-          plan,
-          status: "active",
-          yookassa_payment_id: paymentId,
-          yookassa_payment_method_id: effectivePaymentMethodId,
-          current_period_start: periodStart.toISOString(),
-          current_period_end: periodEnd.toISOString(),
-          cancel_at_period_end: false,
-          updated_at: now.toISOString(),
-        },
-        { onConflict: "user_id" }
-      )
-      .select("id")
-      .single();
+    let subscriptionId = existingSub?.id ?? null;
+
+    if (!alreadyExtended) {
+      const now = new Date();
+      const periodStart =
+        metadata.type === "subscription_renewal" && existingSub?.current_period_end
+          ? new Date(existingSub.current_period_end)
+          : now;
+      const periodEnd = new Date(periodStart);
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+      // Upsert subscription and get its id so payments can be linked to it
+      const { data: subscription } = await admin
+        .from("subscriptions")
+        .upsert(
+          {
+            user_id: userId,
+            plan,
+            status: "active",
+            yookassa_payment_id: paymentId,
+            yookassa_payment_method_id: effectivePaymentMethodId,
+            current_period_start: periodStart.toISOString(),
+            current_period_end: periodEnd.toISOString(),
+            cancel_at_period_end: false,
+            updated_at: now.toISOString(),
+          },
+          { onConflict: "user_id" }
+        )
+        .select("id")
+        .single();
+
+      subscriptionId = subscription?.id ?? subscriptionId;
+    }
 
     // Record the payment, linked to the subscription
     await admin.from("payments").upsert(
       {
         user_id: userId,
-        subscription_id: subscription?.id ?? null,
+        subscription_id: subscriptionId,
         yookassa_payment_id: paymentId,
         amount: Number(notification.object?.amount?.value || 0),
         currency: notification.object?.amount?.currency || "RUB",
@@ -195,6 +223,12 @@ export async function POST(req: Request) {
     // A canceled renewal means the recurring charge failed: mark the
     // subscription past_due so the owner can react before losing access.
     if (metadata.type === "subscription_renewal") {
+      const { data: sub } = await admin
+        .from("subscriptions")
+        .select("status")
+        .eq("user_id", userId)
+        .maybeSingle();
+
       await admin
         .from("subscriptions")
         .update({
@@ -203,11 +237,15 @@ export async function POST(req: Request) {
         })
         .eq("user_id", userId);
 
-      const targets = await loadOwnerNotifyTargets(admin, userId);
-      await notifyOwner(
-        targets,
-        `Внимание: автопродление тарифа не удалось (пользователь ${userId}). Подписка переведена в статус past_due.`
-      );
+      // Idempotency: only alert the owner on the first transition to past_due,
+      // so repeated deliveries of the same notification do not spam them.
+      if (sub?.status !== "past_due") {
+        const targets = await loadOwnerNotifyTargets(admin, userId);
+        await notifyOwner(
+          targets,
+          `Внимание: автопродление тарифа не удалось (пользователь ${userId}). Подписка переведена в статус past_due.`
+        );
+      }
     }
   }
 
