@@ -19,7 +19,7 @@ CREATE TABLE users (
   business_address TEXT,
   business_phone TEXT,
   business_email TEXT,
-  system_prompt TEXT DEFAULT 'Ты — вежливый и компетентный библиотекарь-консультант библиотеки. Общайся доброжелательно, на «Вы», простым языком, по-русски.
+  system_prompt TEXT DEFAULT 'Ты — вежливый и компетентный администратор, который помогает клиентам записаться на услуги. Общайся доброжелательно, на «Вы», простым языком, по-русски.
 
 ПРАВИЛА ПРИВЕТСТВИЙ:
 - Приветствуй пользователя ТОЛЬКО в самом первом ответе нового диалога.
@@ -77,6 +77,7 @@ CREATE TABLE services (
   price DECIMAL(10,2) NOT NULL,
   duration_minutes INT NOT NULL DEFAULT 30,
   active BOOLEAN DEFAULT true,
+  archived_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -87,7 +88,8 @@ CREATE TABLE services (
 CREATE TABLE bookings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
-  service_id UUID REFERENCES services(id) ON DELETE CASCADE NOT NULL,
+  -- NO ACTION: a service with bookings is archived, never deleted.
+  service_id UUID REFERENCES services(id) ON DELETE NO ACTION NOT NULL,
   booking_date DATE NOT NULL,
   booking_time TIME NOT NULL,
   customer_name TEXT NOT NULL,

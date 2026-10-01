@@ -4,19 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyInitData } from "@/lib/telegram-auth";
 import { verifyMaxInitData } from "@/lib/max-auth";
 import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
-import { notifyOwner } from "@/lib/notify-owner";
-import {
-  bookingEndTime,
-  findOverlappingSlot,
-  toBookedSlots,
-} from "@/lib/slot";
 import { checkSlotRules, SLOT_RULE_MESSAGES, type WorkingHours } from "@/lib/booking-rules";
-import {
-  hasTooManyActiveBookings,
-  TOO_MANY_BOOKINGS_MESSAGE,
-  type CustomerIdentity,
-} from "@/lib/booking-guard";
-import { insertBooking } from "@/lib/insert-booking";
+import { type CustomerIdentity } from "@/lib/booking-guard";
+import { placeBooking } from "@/lib/place-booking";
 import { z } from "zod";
 import {
   parseJsonBody,
@@ -67,70 +57,6 @@ const updateBookingSchema = z.object({
   id: uuidString,
   status: z.enum(["pending", "confirmed", "cancelled"]),
 });
-
-interface BookingNotificationInput {
-  business: {
-    bot_token?: string | null;
-    max_bot_token?: string | null;
-    telegram_notify_chat_id?: string | null;
-    max_notify_user_id?: string | null;
-  };
-  serviceTitle: string;
-  bookingDate: string;
-  bookingTime: string;
-  customerName: string;
-  customerPhone?: string | null;
-  customerNotes?: string | null;
-  source?: string;
-}
-
-const SOURCE_LABELS: Record<string, string> = {
-  telegram: "Telegram",
-  max: "MAX",
-  mobile: "Веб-приложение",
-  ai: "AI-ассистент",
-};
-
-// Formats "2026-08-24" as "24.08.2026".
-function formatRuDate(isoDate: string): string {
-  const [y, m, d] = isoDate.split("-");
-  return `${d}.${m}.${y}`;
-}
-
-// Builds the new-booking message and sends it to the owner's channels.
-// The notification is awaited so it is delivered before the request ends:
-// on serverless runtimes fire-and-forget HTTP calls are dropped otherwise.
-// A failed notification must not fail the booking (notifyOwner never rejects).
-async function notifyBookingOwner(input: BookingNotificationInput): Promise<void> {
-  const {
-    business,
-    serviceTitle,
-    bookingDate,
-    bookingTime,
-    customerName,
-    customerPhone,
-    customerNotes,
-    source,
-  } = input;
-
-  const lines = [
-    "🔔 Новая запись!",
-    "",
-    `🛠 Услуга: ${serviceTitle}`,
-    `📅 Дата: ${bookingDate}`,
-    `🕒 Время: ${bookingTime}`,
-    `👤 Клиент: ${customerName}`,
-    `📞 Телефон: ${customerPhone || "не указан"}`,
-  ];
-  if (customerNotes) {
-    lines.push(`📝 Комментарий: ${customerNotes}`);
-  }
-  if (source && SOURCE_LABELS[source]) {
-    lines.push(`📲 Источник: ${SOURCE_LABELS[source]}`);
-  }
-
-  await notifyOwner(business, lines.join("\n"));
-}
 
 // GET all bookings for the logged-in user (admin view)
 export async function GET() {
@@ -326,96 +252,27 @@ export async function POST(req: Request) {
     );
   }
 
-  const durationMinutes = service.duration_minutes ?? 30;
-
-  // Date/time rules in the business time zone: not in the past, not too far
-  // ahead, inside working hours for the whole service duration.
-  const ruleError = checkSlotRules({
+  const result = await placeBooking({
+    supabase,
+    businessId: user_id,
+    business,
+    service,
     date: booking_date,
     time: booking_time,
-    durationMinutes,
-    workingHours: business.working_hours as WorkingHours | null,
+    customerName: customer_name,
+    customerPhone: customer_phone,
+    customerNotes: customer_notes,
+    source: platform,
+    identity,
+    select: "*, service:services(*)",
   });
-  if (ruleError) {
-    return NextResponse.json({ error: SLOT_RULE_MESSAGES[ruleError] }, { status: 400 });
+
+  if (!result.ok) {
+    const status = { rules: 400, too_many: 429, taken: 409, error: 500 }[result.code];
+    return NextResponse.json({ error: result.message }, { status });
   }
 
-  if (await hasTooManyActiveBookings(supabase, user_id, identity)) {
-    return NextResponse.json({ error: TOO_MANY_BOOKINGS_MESSAGE }, { status: 429 });
-  }
-
-  const endTime = bookingEndTime(booking_time, durationMinutes);
-
-  // Check for bookings that overlap the requested interval. A service takes
-  // `duration_minutes`, so a booking blocks the whole [start, start+duration)
-  // window, not just its starting minute.
-  const { data: existingBookings } = await supabase
-    .from("bookings")
-    .select("booking_time, service:services!inner(duration_minutes)")
-    .eq("user_id", user_id)
-    .eq("booking_date", booking_date)
-    .neq("status", "cancelled");
-
-  if (findOverlappingSlot(toBookedSlots(existingBookings), booking_time, durationMinutes)) {
-    return NextResponse.json(
-      { error: "Это время уже занято. Выберите другое." },
-      { status: 409 }
-    );
-  }
-
-  const { data, error } = await insertBooking(
-    supabase,
-    {
-      service_id,
-      user_id,
-      booking_date,
-      booking_time,
-      customer_name,
-      customer_phone: customer_phone || null,
-      customer_notes: customer_notes || null,
-      status: "pending",
-    },
-    {
-      source: platform,
-      customer_messenger_id: identity.kind === "messenger" ? identity.messengerId : null,
-    },
-    "*, service:services(*)"
-  );
-
-  if (error) {
-    // The unique index on (user_id, booking_date, booking_time) handles the
-    // identical-start case (23505); the bookings_no_overlap exclusion
-    // constraint atomically rejects overlapping intervals (23P01), so the
-    // SELECT -> INSERT race above cannot cause a double booking.
-    if (error.code === "23505" || error.code === "23P01") {
-      return NextResponse.json(
-        { error: "Это время уже занято. Выберите другое." },
-        { status: 409 }
-      );
-    }
-    console.error("Booking insert failed:", error);
-    return NextResponse.json(
-      { error: "Не удалось создать запись, попробуйте ещё раз." },
-      { status: 500 }
-    );
-  }
-
-  // Notify the owner (awaited for delivery; notifyOwner never rejects, so a
-  // failed notification cannot fail the booking)
-  if (data) {
-    await notifyBookingOwner({
-      business,
-      serviceTitle: service.title,
-      bookingDate: formatRuDate(booking_date),
-      bookingTime: `${booking_time}–${endTime}`,
-      customerName: customer_name,
-      customerPhone: customer_phone,
-      customerNotes: customer_notes,
-      source: platform,
-    });
-  }
-
-  return NextResponse.json(data, { status: 201 });
+  return NextResponse.json(result.booking, { status: 201 });
 }
 
 // PATCH update booking status
