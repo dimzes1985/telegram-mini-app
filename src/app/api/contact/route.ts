@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendMaxMessage } from "@/lib/max-bot";
 import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 import { z } from "zod";
+import { getClientIp } from "@/lib/client-ip";
 import {
   parseJsonBody,
   invalidJsonResponse,
@@ -32,10 +33,7 @@ const OWNER_MAX_USER_ID = Number(process.env.CONTACT_MAX_USER_ID || 30876538);
 export async function POST(req: Request) {
   pruneRateLimitBuckets();
 
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
-    "unknown";
+  const ip = getClientIp(req);
 
   const { allowed, retryAfterMs } = await rateLimit(`contact:${ip}`, {
     windowMs: 60 * 60 * 1000,

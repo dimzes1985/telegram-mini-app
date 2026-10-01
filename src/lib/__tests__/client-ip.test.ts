@@ -2,6 +2,16 @@ import { describe, it, expect } from "vitest";
 import { getClientIp, phoneDigits } from "@/lib/client-ip";
 
 describe("getClientIp", () => {
+  it("prefers x-vercel-forwarded-for over spoofable headers", () => {
+    const req = new Request("http://localhost", {
+      headers: {
+        "x-vercel-forwarded-for": "203.0.113.7",
+        "x-forwarded-for": "1.1.1.1, 10.9.9.9",
+      },
+    });
+    expect(getClientIp(req)).toBe("203.0.113.7");
+  });
+
   it("reads the first x-forwarded-for address", () => {
     const req = new Request("http://localhost", {
       headers: { "x-forwarded-for": "10.1.2.3, 10.9.9.9" },

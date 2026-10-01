@@ -8,12 +8,13 @@ import {
 import { z } from "zod";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { demoTimeSlots } from "@/lib/demo-slots";
-
-interface WorkingHoursDay {
-  start: string;
-  end: string;
-  enabled: boolean;
-}
+import { daysBetween, isValidIsoDate, nowInTimeZone } from "@/lib/business-time";
+import {
+  MAX_BOOKING_DAYS_AHEAD,
+  MIN_LEAD_MINUTES,
+  workingWindow,
+  type WorkingHours,
+} from "@/lib/booking-rules";
 
 const timeslotsQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date (expected YYYY-MM-DD)"),
@@ -54,7 +55,7 @@ export async function GET(req: Request) {
     .from("services")
     .select("duration_minutes, user_id")
     .eq("id", service_id)
-    .single();
+    .maybeSingle();
 
   if (!service) {
     return NextResponse.json({ error: "Service not found" }, { status: 404 });
@@ -74,27 +75,24 @@ export async function GET(req: Request) {
     .from("users")
     .select("working_hours")
     .eq("id", business_id)
-    .single();
+    .maybeSingle();
 
-  // Get day of week from date (0 = Sunday, 1 = Monday, etc.)
-  const dateObj = new Date(date + "T00:00:00");
-  const dayOfWeek = dateObj.getDay();
-  const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-  const dayName = dayNames[dayOfWeek];
-
-  const workingHours = user?.working_hours as Record<string, WorkingHoursDay> | null;
-  const todayHours = workingHours?.[dayName];
-
-  // If day is disabled or no working hours configured, return empty
-  if (!todayHours || !todayHours.enabled) {
+  // Day-of-week, "today" and "now" are evaluated in the business time zone
+  // (the server runs in UTC on Vercel).
+  if (!isValidIsoDate(date)) {
+    return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+  }
+  const local = nowInTimeZone();
+  const daysAhead = daysBetween(local.date, date);
+  if (daysAhead < 0 || daysAhead > MAX_BOOKING_DAYS_AHEAD) {
     return NextResponse.json([]);
   }
 
-  // Parse working hours start/end
-  const [startHour, startMin] = todayHours.start.split(":").map(Number);
-  const [endHour, endMin] = todayHours.end.split(":").map(Number);
-  const startMinutes = startHour * 60 + startMin;
-  const endMinutes = endHour * 60 + endMin;
+  const window = workingWindow(user?.working_hours as WorkingHours | null, date);
+  // Day is closed, not configured or malformed
+  if (!window) {
+    return NextResponse.json([]);
+  }
 
   // Get existing bookings for this date, with each service's duration so we
   // can tell whether a proposed slot overlaps an already booked interval.
@@ -111,21 +109,17 @@ export async function GET(req: Request) {
   // duration so a slot's interval never overlaps the next slot of the same
   // service, and every slot fits entirely inside the work day.
   const slots = [];
-  const isToday = dateObj.toDateString() === new Date().toDateString();
+  const isToday = daysAhead === 0;
   const step = Math.max(15, durationMinutes);
   for (
-    let minutes = startMinutes;
-    minutes + durationMinutes <= endMinutes;
+    let minutes = window.start;
+    minutes + durationMinutes <= window.end;
     minutes += step
   ) {
-    const time = minutesToTime(minutes);
-    if (isToday) {
-      const now = new Date();
-      const nowMinutes = now.getHours() * 60 + now.getMinutes();
-      if (minutes < nowMinutes) {
-        continue;
-      }
+    if (isToday && minutes < local.minutes + MIN_LEAD_MINUTES) {
+      continue;
     }
+    const time = minutesToTime(minutes);
     slots.push({
       time,
       available: !findOverlappingSlot(bookedSlots, time, durationMinutes),

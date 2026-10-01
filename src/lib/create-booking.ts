@@ -1,11 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notifyOwner } from "@/lib/notify-owner";
+import { bookingEndTime, findOverlappingSlot, toBookedSlots } from "@/lib/slot";
+import { checkSlotRules, SLOT_RULE_MESSAGES, type WorkingHours } from "@/lib/booking-rules";
 import {
-  bookingEndTime,
-  findOverlappingSlot,
-  timeToMinutes,
-  toBookedSlots,
-} from "@/lib/slot";
+  hasTooManyActiveBookings,
+  TOO_MANY_BOOKINGS_MESSAGE,
+} from "@/lib/booking-guard";
+import { insertBooking } from "@/lib/insert-booking";
+import { rateLimit } from "@/lib/rate-limit";
 
 export interface CreateBookingInput {
   service_title: string;
@@ -16,19 +18,15 @@ export interface CreateBookingInput {
   customer_notes?: string | null;
 }
 
+// Verified messenger identity of the customer the assistant is talking to.
+export interface BookingCustomer {
+  source: "telegram" | "max";
+  messengerId: string;
+}
+
 export type CreateBookingResult =
   | { ok: true; message: string; booking: unknown }
   | { ok: false; error: string };
-
-const DAY_NAMES = [
-  "sunday",
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-];
 
 // Formats "2026-08-24" as "24.08.2026".
 function formatDate(isoDate: string): string {
@@ -37,32 +35,31 @@ function formatDate(isoDate: string): string {
 }
 
 // Creates a booking for a business from parsed natural-language input.
-// Reuses the same validation rules as POST /api/bookings: the service must
-// exist and be active, the slot must be free and inside working hours.
+// Uses the same rules as POST /api/bookings (lib/booking-rules): the service
+// must exist and be active, the slot must be in the future, inside working
+// hours and free.
 export async function createBookingForBusiness(
   supabase: SupabaseClient,
   businessId: string,
-  input: CreateBookingInput
+  input: CreateBookingInput,
+  customer?: BookingCustomer
 ): Promise<CreateBookingResult> {
-  const bookingDate = input.booking_date;
-  const bookingTime = input.booking_time;
+  const bookingDate = input.booking_date.trim();
+  const bookingTime = input.booking_time.trim().slice(0, 5);
+  const customerName = input.customer_name.trim().slice(0, 200);
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate)) {
-    return { ok: false, error: "Неверный формат даты (нужен ГГГГ-ММ-ДД)." };
-  }
-  if (!/^\d{2}:\d{2}$/.test(bookingTime)) {
-    return { ok: false, error: "Неверный формат времени (нужен ЧЧ:ММ)." };
+  if (!customerName) {
+    return { ok: false, error: "Не указано имя клиента." };
   }
 
-  // Reject dates in the past.
-  const dateObj = new Date(`${bookingDate}T00:00:00`);
-  if (Number.isNaN(dateObj.getTime())) {
-    return { ok: false, error: "Некорректная дата." };
-  }
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (dateObj < today) {
-    return { ok: false, error: "Нельзя записаться на прошедшую дату." };
+  if (customer) {
+    const limit = await rateLimit(
+      `bookings:ai:${businessId}:${customer.source}:${customer.messengerId}`,
+      { windowMs: 60 * 60_000, max: 10 }
+    );
+    if (!limit.allowed) {
+      return { ok: false, error: "Слишком много попыток записи, попробуйте позже." };
+    }
   }
 
   const { data: business } = await supabase
@@ -71,7 +68,11 @@ export async function createBookingForBusiness(
       "bot_token, max_bot_token, working_hours, telegram_notify_chat_id, max_notify_user_id"
     )
     .eq("id", businessId)
-    .single();
+    .maybeSingle();
+
+  if (!business) {
+    return { ok: false, error: "Бизнес не найден." };
+  }
 
   // Find the requested service (case-insensitive exact title match).
   const { data: services } = await supabase
@@ -94,44 +95,31 @@ export async function createBookingForBusiness(
   }
 
   const durationMinutes = service.duration_minutes ?? 30;
-  const startMinutes = timeToMinutes(bookingTime);
-  if (startMinutes === null) {
-    return { ok: false, error: "Неверный формат времени (нужен ЧЧ:ММ)." };
+
+  const ruleError = checkSlotRules({
+    date: bookingDate,
+    time: bookingTime,
+    durationMinutes,
+    workingHours: business.working_hours as WorkingHours | null,
+  });
+  if (ruleError) {
+    return { ok: false, error: SLOT_RULE_MESSAGES[ruleError] };
   }
+
+  if (
+    customer &&
+    (await hasTooManyActiveBookings(supabase, businessId, {
+      kind: "messenger",
+      source: customer.source,
+      messengerId: customer.messengerId,
+    }))
+  ) {
+    return { ok: false, error: TOO_MANY_BOOKINGS_MESSAGE };
+  }
+
   const endTime = bookingEndTime(bookingTime, durationMinutes);
 
-  // Validate the requested time fits within the business working hours,
-  // including the full service duration (start and end inside the work day).
-  if (business?.working_hours) {
-    const dayName = DAY_NAMES[dateObj.getDay()];
-    const dayHours = (
-      business.working_hours as Record<
-        string,
-        { start: string; end: string; enabled: boolean }
-      >
-    )[dayName];
-
-    if (!dayHours?.enabled) {
-      return { ok: false, error: "Библиотека в этот день не работает." };
-    }
-    const dayStart = timeToMinutes(dayHours.start);
-    const dayEnd = timeToMinutes(dayHours.end);
-    if (
-      dayStart === null ||
-      dayEnd === null ||
-      startMinutes < dayStart ||
-      startMinutes + durationMinutes > dayEnd
-    ) {
-      return {
-        ok: false,
-        error: `Время вне режима работы: библиотека работает с ${dayHours.start} до ${dayHours.end}.`,
-      };
-    }
-  }
-
-  // Check for bookings that overlap the requested interval. A service takes
-  // `duration_minutes`, so a booking blocks the whole [start, start+duration)
-  // window, not just its starting minute.
+  // Check for bookings that overlap the requested interval.
   const { data: existing } = await supabase
     .from("bookings")
     .select("booking_time, service:services!inner(duration_minutes)")
@@ -139,58 +127,56 @@ export async function createBookingForBusiness(
     .eq("booking_date", bookingDate)
     .neq("status", "cancelled");
 
-  const existingSlots = toBookedSlots(existing);
-
-  if (findOverlappingSlot(existingSlots, bookingTime, durationMinutes)) {
+  if (findOverlappingSlot(toBookedSlots(existing), bookingTime, durationMinutes)) {
     return {
       ok: false,
       error: "Это время уже занято. Предложите клиенту другое время.",
     };
   }
 
-  const { data: booking, error } = await supabase
-    .from("bookings")
-    .insert({
+  const { data: booking, error } = await insertBooking(
+    supabase,
+    {
       service_id: service.id,
       user_id: businessId,
       booking_date: bookingDate,
       booking_time: bookingTime,
-      customer_name: input.customer_name,
-      customer_phone: input.customer_phone ?? null,
-      customer_notes: input.customer_notes ?? null,
+      customer_name: customerName,
+      customer_phone: input.customer_phone?.trim().slice(0, 50) || null,
+      customer_notes: input.customer_notes?.trim().slice(0, 1000) || null,
       status: "pending",
-    })
-    .select()
-    .single();
+    },
+    {
+      source: customer?.source ?? "ai",
+      customer_messenger_id: customer?.messengerId ?? null,
+    }
+  );
 
   if (error) {
-    // The unique index on (user_id, booking_date, booking_time) handles the
-    // identical-start case (23505); the bookings_no_overlap exclusion
-    // constraint atomically rejects overlapping intervals (23P01), so the
-    // SELECT -> INSERT race above cannot cause a double booking.
+    // 23505: unique start index; 23P01: bookings_no_overlap exclusion
+    // constraint. Both mean a concurrent request took the slot.
     if (error.code === "23505" || error.code === "23P01") {
       return {
         ok: false,
         error: "Это время уже занято. Предложите клиенту другое время.",
       };
     }
+    console.error("AI booking insert failed:", error);
     return { ok: false, error: "Не удалось создать запись, попробуйте ещё раз." };
   }
 
-  // Notify the owner. Await delivery so the message is not dropped when the
-  // request lifecycle ends; notifyOwner never rejects, so a failed
-  // notification cannot fail the booking.
-  if (business) {
-    await notifyOwner(business, [
-      "🔔 Новая запись!",
-      "",
-      `🛠 Услуга: ${service.title}`,
-      `📅 Дата: ${formatDate(bookingDate)}`,
-      `🕒 Время: ${bookingTime}–${endTime}`,
-      `👤 Клиент: ${input.customer_name}`,
-      `📞 Телефон: ${input.customer_phone || "не указан"}`,
-    ].join("\n"));
-  }
+  // Notify the owner. notifyOwner never rejects, so a failed notification
+  // cannot fail the booking.
+  await notifyOwner(business, [
+    "🔔 Новая запись!",
+    "",
+    `🛠 Услуга: ${service.title}`,
+    `📅 Дата: ${formatDate(bookingDate)}`,
+    `🕒 Время: ${bookingTime}–${endTime}`,
+    `👤 Клиент: ${customerName}`,
+    `📞 Телефон: ${input.customer_phone || "не указан"}`,
+    "📲 Источник: AI-ассистент",
+  ].join("\n"));
 
   return {
     ok: true,
