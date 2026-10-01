@@ -46,6 +46,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [workingHours, setWorkingHours] = useState<Record<string, WorkingHoursDay> | null>(null);
+  const [closedDates, setClosedDates] = useState<string[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [loading, setLoading] = useState(false);
@@ -85,6 +86,9 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
         if (!cancelled && data?.working_hours) {
           setWorkingHours(data.working_hours);
         }
+        if (!cancelled && Array.isArray(data?.closed_dates)) {
+          setClosedDates(data.closed_dates);
+        }
       })
       .catch(() => {});
     return () => {
@@ -111,6 +115,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
   }, [selectedDate, selectedService, businessId]);
 
   const isWorkingDay = (date: Date): boolean => {
+    if (closedDates.includes(format(date, "yyyy-MM-dd"))) return false;
     if (!workingHours) return true;
     const dayName = DAY_NAMES[date.getDay()];
     const hours = workingHours[dayName];

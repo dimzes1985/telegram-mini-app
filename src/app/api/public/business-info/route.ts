@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { listUpcomingClosures } from "@/lib/closures";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { DEMO_USER_ID, getDemoState } from "@/lib/demo-store";
@@ -46,5 +47,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Не удалось загрузить данные" }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  // Upcoming days off, so the customer calendar can disable them.
+  const closures = await listUpcomingClosures(supabase, businessId);
+  return NextResponse.json({ ...data, closed_dates: closures.map((c) => c.date) });
 }

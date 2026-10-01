@@ -8,6 +8,7 @@ import {
   type CustomerIdentity,
 } from "@/lib/booking-guard";
 import { insertBooking } from "@/lib/insert-booking";
+import { getClosure } from "@/lib/closures";
 
 export type BookingSource = "telegram" | "max" | "mobile" | "ai";
 
@@ -63,6 +64,7 @@ export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBooki
     time,
     durationMinutes,
     workingHours: (business.working_hours ?? null) as WorkingHours | null,
+    isClosedDate: Boolean(await getClosure(supabase, businessId, date)),
   });
   if (ruleError) {
     return { ok: false, code: "rules", message: SLOT_RULE_MESSAGES[ruleError] };

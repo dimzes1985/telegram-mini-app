@@ -11,6 +11,7 @@ import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 import { getAiUsage, incrementAiUsage } from "@/lib/ai-usage";
 import { getAiModel } from "@/lib/ai";
 import { buildSystemPrompt, makeBookingTool, makeSlotsTool } from "@/lib/ai-assistant";
+import { listUpcomingClosures } from "@/lib/closures";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { DEMO_USER_ID, buildDemoChatReply } from "@/lib/demo-store";
 
@@ -186,7 +187,8 @@ export async function POST(req: Request) {
     .eq("user_id", businessId)
     .eq("active", true);
 
-  const systemPrompt = buildSystemPrompt(user, services ?? []);
+  const closures = await listUpcomingClosures(supabase, businessId);
+  const systemPrompt = buildSystemPrompt(user, services ?? [], closures);
 
   // The client (useChat) sends UIMessage objects; reduce them to plain
   // user/assistant text turns.

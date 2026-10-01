@@ -28,6 +28,8 @@ export interface Booking {
   customer_phone: string | null;
   customer_notes: string | null;
   status: "pending" | "confirmed" | "cancelled";
+  source?: "telegram" | "max" | "mobile" | "ai" | "admin" | null;
+  cancelled_by?: "customer" | "owner" | null;
   created_at: string;
   updated_at: string;
   // Joined data

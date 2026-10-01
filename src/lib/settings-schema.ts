@@ -13,11 +13,36 @@ export const DAY_KEYS = [
 
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Время должно быть в формате ЧЧ:ММ");
 
+const optionalHhmm = z
+  .union([hhmm, z.literal(""), z.null()])
+  .optional()
+  .transform((v) => (v ? v : null));
+
 const daySchema = z
-  .object({ start: hhmm, end: hhmm, enabled: z.boolean() })
+  .object({
+    start: hhmm,
+    end: hhmm,
+    enabled: z.boolean(),
+    break_start: optionalHhmm,
+    break_end: optionalHhmm,
+  })
   .refine(
     (d) => !d.enabled || (timeToMinutes(d.end) ?? 0) > (timeToMinutes(d.start) ?? 0),
     { message: "Время окончания работы должно быть позже начала" }
+  )
+  .refine((d) => !d.break_start === !d.break_end, {
+    message: "Укажите и начало, и конец перерыва",
+  })
+  .refine(
+    (d) => {
+      if (!d.enabled || !d.break_start || !d.break_end) return true;
+      const bs = timeToMinutes(d.break_start) ?? 0;
+      const be = timeToMinutes(d.break_end) ?? 0;
+      const st = timeToMinutes(d.start) ?? 0;
+      const en = timeToMinutes(d.end) ?? 0;
+      return be > bs && bs >= st && be <= en;
+    },
+    { message: "Перерыв должен быть внутри рабочего дня, а его конец — позже начала" }
   );
 
 export const workingHoursSchema = z.object(
