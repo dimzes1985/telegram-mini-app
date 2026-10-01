@@ -62,6 +62,9 @@ export default function SettingsPage() {
   const [telegramNotifyChatId, setTelegramNotifyChatId] = useState("");
   const [maxNotifyUserId, setMaxNotifyUserId] = useState("");
   const [businessId, setBusinessId] = useState("");
+  // "" = step by the service duration; otherwise 15 / 30 / 60.
+  const [slotStep, setSlotStep] = useState("");
+  const [bufferMinutes, setBufferMinutes] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -96,6 +99,8 @@ export default function SettingsPage() {
         setMaxBotWebhookSet(data.max_bot_webhook_set || false);
         setTelegramNotifyChatId(data.telegram_notify_chat_id || "");
         setMaxNotifyUserId(data.max_notify_user_id || "");
+        setSlotStep(data.slot_step_minutes ? String(data.slot_step_minutes) : "");
+        setBufferMinutes(Number(data.buffer_minutes) || 0);
         setPlan(data.plan || "free");
         setAiUsage(data.ai_usage || null);
         setLoading(false);
@@ -162,6 +167,8 @@ export default function SettingsPage() {
       working_hours: workingHours,
       telegram_notify_chat_id: telegramNotifyChatId || null,
       max_notify_user_id: maxNotifyUserId || null,
+      slot_step_minutes: slotStep ? Number(slotStep) : null,
+      buffer_minutes: bufferMinutes,
     };
 
     // Only include bot_token if user entered a new one
@@ -751,6 +758,47 @@ export default function SettingsPage() {
                 )}
               </div>
             ))}
+
+            <div className="grid gap-4 border-t pt-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="slot-step">Шаг записи</Label>
+                <select
+                  id="slot-step"
+                  value={slotStep}
+                  onChange={(e) => setSlotStep(e.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                >
+                  <option value="">По длительности услуги</option>
+                  <option value="15">Каждые 15 минут</option>
+                  <option value="30">Каждые 30 минут</option>
+                  <option value="60">Каждый час</option>
+                </select>
+                <p className="text-xs text-gray-500">
+                  Как часто начинаются окошки для записи. Например, при шаге 30 минут клиент
+                  увидит 10:00, 10:30, 11:00…
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="buffer-minutes">Пауза между клиентами</Label>
+                <select
+                  id="buffer-minutes"
+                  value={String(bufferMinutes)}
+                  onChange={(e) => setBufferMinutes(Number(e.target.value))}
+                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                >
+                  <option value="0">Без паузы</option>
+                  <option value="5">5 минут</option>
+                  <option value="10">10 минут</option>
+                  <option value="15">15 минут</option>
+                  <option value="20">20 минут</option>
+                  <option value="30">30 минут</option>
+                </select>
+                <p className="text-xs text-gray-500">
+                  Время на уборку или отдых после каждой записи. Следующий клиент не сможет
+                  записаться в это время.
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

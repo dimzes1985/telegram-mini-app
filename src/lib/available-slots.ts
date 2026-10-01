@@ -9,6 +9,7 @@ import {
 } from "@/lib/booking-rules";
 import { getClosure } from "@/lib/closures";
 import { findOverlappingSlot, minutesToTime, toBookedSlots } from "@/lib/slot";
+import { gridStepMinutes, loadScheduleSettings } from "@/lib/schedule-settings";
 
 export interface TimeSlotInfo {
   time: string;
@@ -39,6 +40,8 @@ export async function computeTimeSlots(
 
   if (await getClosure(supabase, businessId, date)) return [];
 
+  const settings = await loadScheduleSettings(supabase, businessId);
+
   const { data: existingBookings } = await supabase
     .from("bookings")
     .select("booking_time, service:services!inner(duration_minutes)")
@@ -48,10 +51,11 @@ export async function computeTimeSlots(
 
   const bookedSlots = toBookedSlots(existingBookings);
 
-  // The grid steps by the service duration so a slot never overlaps the next
-  // slot of the same service, and every slot fits inside the work day.
+  // By default the grid steps by the service duration (+ pause) so a slot
+  // never overlaps the next slot of the same service; the owner may pick a
+  // fixed 15/30/60-minute step instead. Every slot fits inside the work day.
   const slots: TimeSlotInfo[] = [];
-  const step = Math.max(15, durationMinutes);
+  const step = gridStepMinutes(settings, durationMinutes);
   for (let m = window.start; m + durationMinutes <= window.end; m += step) {
     // A slot touching the break restarts the grid right after the break.
     if (overlapsBreak(window, m, durationMinutes) && window.breakEnd !== null) {
@@ -62,7 +66,12 @@ export async function computeTimeSlots(
     const time = minutesToTime(m);
     slots.push({
       time,
-      available: !findOverlappingSlot(bookedSlots, time, durationMinutes),
+      available: !findOverlappingSlot(
+        bookedSlots,
+        time,
+        durationMinutes,
+        settings.bufferMinutes
+      ),
     });
   }
   return slots;

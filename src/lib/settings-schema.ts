@@ -91,6 +91,17 @@ export const settingsUpdateSchema = z.object({
   max_bot_username: optionalText(100),
   telegram_notify_chat_id: optionalId,
   max_notify_user_id: optionalId,
+  // Fixed slot grid step; null = step by the service duration (+ pause).
+  slot_step_minutes: z
+    .union([z.literal(15), z.literal(30), z.literal(60), z.null()])
+    .optional(),
+  // Pause after each booking.
+  buffer_minutes: z
+    .number()
+    .int("Пауза должна быть целым числом минут")
+    .min(0, "Пауза не может быть отрицательной")
+    .max(120, "Пауза не может быть больше 120 минут")
+    .optional(),
 });
 
 export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;

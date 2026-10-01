@@ -61,18 +61,28 @@ export function toBookedSlots(rows: unknown): BookedSlot[] {
 }
 
 // Returns the first existing booking that overlaps [startTime, startTime +
-// durationMinutes), or null when the slot is free.
+// durationMinutes), or null when the slot is free. `bufferMinutes` is the
+// pause the business keeps after every booking: both the existing bookings
+// and the new one are extended by it (same rule as the DB trigger).
 export function findOverlappingSlot(
   existing: BookedSlot[],
   startTime: string,
-  durationMinutes: number
+  durationMinutes: number,
+  bufferMinutes = 0
 ): BookedSlot | null {
   const start = timeToMinutes(startTime);
   if (start === null) return null;
   for (const slot of existing) {
     const otherStart = timeToMinutes(slot.startTime);
     if (otherStart === null) continue;
-    if (intervalsOverlap(start, durationMinutes, otherStart, slot.durationMinutes)) {
+    if (
+      intervalsOverlap(
+        start,
+        durationMinutes + bufferMinutes,
+        otherStart,
+        slot.durationMinutes + bufferMinutes
+      )
+    ) {
       return slot;
     }
   }

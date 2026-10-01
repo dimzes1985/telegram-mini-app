@@ -99,6 +99,27 @@ export async function GET() {
     // Columns might not exist yet
   }
 
+  // Slot grid settings (migration-step5.sql; might not exist yet)
+  let scheduleData: { slot_step_minutes: number | null; buffer_minutes: number } = {
+    slot_step_minutes: null,
+    buffer_minutes: 0,
+  };
+  try {
+    const { data: scheduleResult } = await supabase
+      .from("users")
+      .select("slot_step_minutes, buffer_minutes")
+      .eq("id", user.id)
+      .single();
+    if (scheduleResult) {
+      scheduleData = {
+        slot_step_minutes: scheduleResult.slot_step_minutes ?? null,
+        buffer_minutes: scheduleResult.buffer_minutes ?? 0,
+      };
+    }
+  } catch {
+    // Columns might not exist yet
+  }
+
   // Mask bot token for security
   const maskedData: Record<string, unknown> = {
     id: user.id,
@@ -106,6 +127,7 @@ export async function GET() {
     ...botData,
     ...maxBotData,
     ...notifyData,
+    ...scheduleData,
     bot_token: botData.bot_token ? "••••••••" + botData.bot_token.slice(-8) : null,
     bot_token_set: !!botData.bot_token,
     max_bot_token: maxBotData.max_bot_token ? "••••••••" + maxBotData.max_bot_token.slice(-8) : null,
@@ -173,6 +195,8 @@ export async function PUT(req: Request) {
     max_bot_username,
     telegram_notify_chat_id,
     max_notify_user_id,
+    slot_step_minutes,
+    buffer_minutes,
   } = raw;
 
   const bot_token = typeof raw.bot_token === "string" ? raw.bot_token : undefined;
@@ -188,6 +212,8 @@ export async function PUT(req: Request) {
   if (working_hours !== undefined) updateData.working_hours = working_hours;
   if (telegram_notify_chat_id !== undefined) updateData.telegram_notify_chat_id = telegram_notify_chat_id;
   if (max_notify_user_id !== undefined) updateData.max_notify_user_id = max_notify_user_id;
+  if (slot_step_minutes !== undefined) updateData.slot_step_minutes = slot_step_minutes;
+  if (buffer_minutes !== undefined) updateData.buffer_minutes = buffer_minutes;
 
   // Handle bot token - only update if it's not the masked value.
   // The token is validated against Telegram's getMe BEFORE saving: an invalid
