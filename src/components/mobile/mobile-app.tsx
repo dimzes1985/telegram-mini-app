@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { addDays, format, startOfDay } from "date-fns";
-import { MAX_BOOKING_DAYS_AHEAD } from "@/lib/booking-rules";
+import { format } from "date-fns";
 import { MyBookings } from "@/components/customer/my-bookings";
 import { ru } from "date-fns/locale";
 import {
@@ -21,7 +20,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Calendar as DayPicker } from "@/components/ui/calendar";
+import { BookingCalendar } from "@/components/booking-calendar";
+import { useTimeSlots } from "@/lib/use-time-slots";
 import { bookingEndTime } from "@/lib/slot";
 import {
   CUSTOMER_KEY,
@@ -34,7 +34,7 @@ import {
   type SavedBusiness,
   type SavedCustomer,
 } from "@/lib/mobile-storage";
-import type { Service, TimeSlot } from "@/types";
+import type { Service } from "@/types";
 
 interface WorkingHoursDay {
   start: string;
@@ -76,7 +76,6 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [customerName, setCustomerName] = useState(
     () => readJson<SavedCustomer>(CUSTOMER_KEY)?.name || ""
   );
@@ -170,21 +169,11 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
     };
   }, [initialBusinessId]);
 
-  useEffect(() => {
-    if (!selectedDate || !selectedService || !business) return;
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
-    const controller = new AbortController();
-    fetch(
-      `/api/timeslots?date=${dateStr}&service_id=${selectedService.id}&business_id=${business.id}`,
-      { signal: controller.signal }
-    )
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => setTimeSlots(Array.isArray(data) ? data : []))
-      .catch((e) => {
-        if ((e as Error).name !== "AbortError") setTimeSlots([]);
-      });
-    return () => controller.abort();
-  }, [selectedDate, selectedService, business]);
+  const { slots: timeSlots, refresh: refreshSlots } = useTimeSlots({
+    businessId: business?.id,
+    serviceId: selectedService?.id,
+    date: selectedDate,
+  });
 
   const isWorkingDay = (date: Date) => {
     if (business?.closed_dates?.includes(format(date, "yyyy-MM-dd"))) return false;
@@ -220,6 +209,12 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
       if (!res.ok) {
         haptic("error");
         setError(data.error || "Не удалось записаться");
+        if (res.status === 409) {
+          // Someone else took this time: show fresh slots to pick another.
+          refreshSlots();
+          setSelectedTime(null);
+          setScreen("datetime");
+        }
         return;
       }
       writeJson(CUSTOMER_KEY, { name: customerName, phone: customerPhone });
@@ -445,13 +440,13 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
           <p className="mb-3 text-sm text-blue-100">
             {selectedService?.title} — {selectedService?.price} ₽
           </p>
+          {error && <p className="mb-3 text-sm text-rose-300">{error}</p>}
           <div className="rounded-3xl bg-white p-3">
-            <DayPicker
-              mode="single"
+            <BookingCalendar
               selected={selectedDate}
               onSelect={(value) => setSelectedDate(value)}
-              disabled={(date: Date) => date < startOfDay(new Date()) ||
-              date > addDays(startOfDay(new Date()), MAX_BOOKING_DAYS_AHEAD) || !isWorkingDay(date)}
+              isDayAvailable={isWorkingDay}
+              className="border-0"
             />
           </div>
           {selectedDate && (
@@ -472,6 +467,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
                       className="h-10 rounded-xl bg-white text-slate-900 disabled:opacity-40"
                       onClick={() => {
                         setSelectedTime(slot.time);
+                        setError(null);
                         haptic();
                         setScreen("confirm");
                       }}

@@ -7,6 +7,7 @@ import { Calendar, Clock, CheckCircle } from "lucide-react";
 import { bookingStatusLabel } from "@/lib/labels";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getDemoState } from "@/lib/demo-store";
+import { AppLinksCard } from "@/components/admin/app-links-card";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
@@ -57,6 +58,8 @@ export default async function AdminDashboard() {
           Демо-режим: Supabase не настроен, показаны тестовые данные. Для боевого входа добавьте NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_ANON_KEY.
         </p>
       )}
+
+      <AppLinksCard />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-3 mb-6 sm:gap-4 sm:mb-8 lg:grid-cols-4 lg:gap-6">
