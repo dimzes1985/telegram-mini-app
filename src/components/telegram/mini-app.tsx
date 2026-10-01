@@ -4,10 +4,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChatInterface } from "@/components/telegram/chat-interface";
 import { BookingFlow } from "@/components/telegram/booking-flow";
 import { useMessenger } from "@/lib/messenger";
-import { MessageSquare, Calendar } from "lucide-react";
+import { useState } from "react";
+import { MessageSquare, Calendar, ListChecks } from "lucide-react";
+import { MyBookings } from "@/components/customer/my-bookings";
 
 export default function MiniApp({ businessId }: { businessId: string | null }) {
-  const { user, webApp, colorScheme } = useMessenger();
+  const { user, webApp, colorScheme, platform, initData } = useMessenger();
+  const [tab, setTab] = useState("chat");
 
   if (!businessId) {
     return (
@@ -48,13 +51,24 @@ export default function MiniApp({ businessId }: { businessId: string | null }) {
       </header>
 
       {/* Main Content */}
-      <Tabs defaultValue="chat" className="flex-1 flex flex-col">
+      <Tabs value={tab} onValueChange={(v) => setTab(String(v))} className="flex-1 flex flex-col">
         <div className="flex-1 overflow-hidden">
           <TabsContent value="chat" className="h-full m-0">
             <ChatInterface businessId={businessId} />
           </TabsContent>
           <TabsContent value="book" className="h-full m-0 overflow-y-auto">
             <BookingFlow businessId={businessId} />
+          </TabsContent>
+          <TabsContent value="my" className="h-full m-0 overflow-y-auto p-4">
+            {tab === "my" && (
+              <MyBookings
+                businessId={businessId}
+                platform={platform === "max" ? "max" : "telegram"}
+                initData={initData}
+                variant={colorScheme === "dark" ? "dark" : "light"}
+                onBookNew={() => setTab("book")}
+              />
+            )}
           </TabsContent>
         </div>
 
@@ -66,7 +80,7 @@ export default function MiniApp({ businessId }: { businessId: string | null }) {
             borderColor: webApp.themeParams?.section_separator_color || "#e5e5e5",
           }}
         >
-          <TabsList className="grid w-full grid-cols-2 h-14">
+          <TabsList className="grid w-full grid-cols-3 h-14">
             <TabsTrigger
               value="chat"
               className="flex flex-col gap-1 h-full rounded-none data-[state=active]:bg-gray-100"
@@ -82,6 +96,14 @@ export default function MiniApp({ businessId }: { businessId: string | null }) {
             >
               <Calendar className="h-5 w-5" />
               <span className="text-xs">Запись</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="my"
+              className="flex flex-col gap-1 h-full rounded-none data-[state=active]:bg-gray-100"
+              onClick={() => webApp.HapticFeedback.impactOccurred("light")}
+            >
+              <ListChecks className="h-5 w-5" />
+              <span className="text-xs">Мои записи</span>
             </TabsTrigger>
           </TabsList>
         </div>

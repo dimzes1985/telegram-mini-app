@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { addDays, format, startOfDay } from "date-fns";
 import { MAX_BOOKING_DAYS_AHEAD } from "@/lib/booking-rules";
+import { MyBookings } from "@/components/customer/my-bookings";
 import { ru } from "date-fns/locale";
 import {
   ArrowLeft,
@@ -14,6 +15,7 @@ import {
   Search,
   Share2,
   Smartphone,
+  ListChecks,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +25,8 @@ import { Calendar as DayPicker } from "@/components/ui/calendar";
 import { bookingEndTime } from "@/lib/slot";
 import {
   CUSTOMER_KEY,
+  addManageToken,
+  readManageTokens,
   SAVED_BUSINESS_KEY,
   clearKey,
   readJson,
@@ -52,7 +56,7 @@ const DAY_NAMES = [
   "saturday",
 ];
 
-type Screen = "home" | "services" | "datetime" | "confirm" | "success";
+type Screen = "home" | "services" | "datetime" | "confirm" | "success" | "my";
 
 function haptic(kind: "light" | "medium" | "success" | "error" = "light") {
   if (typeof navigator === "undefined" || !navigator.vibrate) return;
@@ -216,6 +220,9 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
         return;
       }
       writeJson(CUSTOMER_KEY, { name: customerName, phone: customerPhone });
+      if (typeof data.manage_token === "string") {
+        addManageToken(business.id, data.manage_token);
+      }
       haptic("success");
       setScreen("success");
     } catch {
@@ -335,6 +342,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
               if (screen === "datetime") setScreen("services");
               if (screen === "confirm") setScreen("datetime");
               if (screen === "success") resetBooking();
+              if (screen === "my") setScreen("services");
             }}
             className="grid size-10 place-items-center rounded-full bg-white/8 text-white"
           >
@@ -347,6 +355,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
               {screen === "datetime" && "Дата и время"}
               {screen === "confirm" && "Подтверждение"}
               {screen === "success" && "Готово"}
+              {screen === "my" && "Мои записи"}
             </p>
           </div>
           <button
@@ -363,8 +372,31 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
         </header>
       )}
 
+      {screen === "my" && business && (
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8">
+          <MyBookings
+            businessId={business.id}
+            platform="mobile"
+            tokens={readManageTokens(business.id)}
+            variant="dark"
+            onBookNew={resetBooking}
+          />
+        </div>
+      )}
+
       {screen === "services" && (
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8">
+          <button
+            type="button"
+            onClick={() => setScreen("my")}
+            className="mb-4 flex w-full items-center justify-between rounded-2xl bg-white/8 px-4 py-3 text-sm text-white"
+          >
+            <span className="flex items-center gap-2">
+              <ListChecks className="size-4" />
+              Мои записи
+            </span>
+            <span className="text-blue-200">→</span>
+          </button>
           {business?.business_address && (
             <p className="mb-4 flex items-center gap-1 text-sm text-blue-100">
               <MapPin className="size-3.5" />
@@ -528,6 +560,10 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
           )}
           <Button className="mt-8 h-12 w-full rounded-2xl" variant="secondary" onClick={resetBooking}>
             Записаться ещё
+          </Button>
+          <Button className="mt-3 h-12 w-full rounded-2xl" variant="ghost" onClick={() => setScreen("my")}>
+            <ListChecks className="mr-2 size-4" />
+            Мои записи
           </Button>
           <Button className="mt-3 h-12 w-full rounded-2xl" variant="ghost" onClick={() => void shareApp()}>
             <Calendar className="mr-2 size-4" />

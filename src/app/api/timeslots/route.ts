@@ -1,20 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  findOverlappingSlot,
-  minutesToTime,
-  toBookedSlots,
-} from "@/lib/slot";
 import { z } from "zod";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { demoTimeSlots } from "@/lib/demo-slots";
-import { daysBetween, isValidIsoDate, nowInTimeZone } from "@/lib/business-time";
-import {
-  MAX_BOOKING_DAYS_AHEAD,
-  MIN_LEAD_MINUTES,
-  workingWindow,
-  type WorkingHours,
-} from "@/lib/booking-rules";
+import { computeTimeSlots } from "@/lib/available-slots";
+import { type WorkingHours } from "@/lib/booking-rules";
 
 const timeslotsQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date (expected YYYY-MM-DD)"),
@@ -70,61 +60,18 @@ export async function GET(req: Request) {
 
   const durationMinutes = service.duration_minutes ?? 30;
 
-  // Get business working hours
   const { data: user } = await supabase
     .from("users")
     .select("working_hours")
     .eq("id", business_id)
     .maybeSingle();
 
-  // Day-of-week, "today" and "now" are evaluated in the business time zone
-  // (the server runs in UTC on Vercel).
-  if (!isValidIsoDate(date)) {
-    return NextResponse.json({ error: "Invalid date" }, { status: 400 });
-  }
-  const local = nowInTimeZone();
-  const daysAhead = daysBetween(local.date, date);
-  if (daysAhead < 0 || daysAhead > MAX_BOOKING_DAYS_AHEAD) {
-    return NextResponse.json([]);
-  }
-
-  const window = workingWindow(user?.working_hours as WorkingHours | null, date);
-  // Day is closed, not configured or malformed
-  if (!window) {
-    return NextResponse.json([]);
-  }
-
-  // Get existing bookings for this date, with each service's duration so we
-  // can tell whether a proposed slot overlaps an already booked interval.
-  const { data: existingBookings } = await supabase
-    .from("bookings")
-    .select("booking_time, service:services!inner(duration_minutes)")
-    .eq("user_id", business_id)
-    .eq("booking_date", date)
-    .neq("status", "cancelled");
-
-  const bookedSlots = toBookedSlots(existingBookings);
-
-  // Generate time slots within working hours. The grid steps by the service
-  // duration so a slot's interval never overlaps the next slot of the same
-  // service, and every slot fits entirely inside the work day.
-  const slots = [];
-  const isToday = daysAhead === 0;
-  const step = Math.max(15, durationMinutes);
-  for (
-    let minutes = window.start;
-    minutes + durationMinutes <= window.end;
-    minutes += step
-  ) {
-    if (isToday && minutes < local.minutes + MIN_LEAD_MINUTES) {
-      continue;
-    }
-    const time = minutesToTime(minutes);
-    slots.push({
-      time,
-      available: !findOverlappingSlot(bookedSlots, time, durationMinutes),
-    });
-  }
+  const slots = await computeTimeSlots(supabase, {
+    businessId: business_id,
+    date,
+    durationMinutes,
+    workingHours: user?.working_hours as WorkingHours | null,
+  });
 
   return NextResponse.json(slots);
 }
