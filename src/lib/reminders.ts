@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEFAULT_BUSINESS_TIMEZONE, nowInTimeZone } from "@/lib/business-time";
+import { addDaysIso, DEFAULT_BUSINESS_TIMEZONE, nowInTimeZone } from "@/lib/business-time";
+
+export { addDaysIso };
 import { sendTelegramMessage } from "@/lib/telegram-bot";
 import { sendMaxMessage } from "@/lib/max-bot";
 import { escapeHtml } from "@/lib/notify-owner";
@@ -29,12 +31,6 @@ export interface ReminderRunResult {
   found: number;
   sent: number;
   failed: number;
-}
-
-// Calendar date `days` after `date` (YYYY-MM-DD).
-export function addDaysIso(date: string, days: number): string {
-  const [y, m, d] = date.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
 export function buildReminderText(row: ReminderRow, html: boolean): string {

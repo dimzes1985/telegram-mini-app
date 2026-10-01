@@ -3,9 +3,11 @@ import { daysBetween, isValidIsoDate, nowInTimeZone } from "@/lib/business-time"
 import {
   MAX_BOOKING_DAYS_AHEAD,
   MIN_LEAD_MINUTES,
+  overlapsBreak,
   workingWindow,
   type WorkingHours,
 } from "@/lib/booking-rules";
+import { getClosure } from "@/lib/closures";
 import { findOverlappingSlot, minutesToTime, toBookedSlots } from "@/lib/slot";
 
 export interface TimeSlotInfo {
@@ -35,6 +37,8 @@ export async function computeTimeSlots(
   const window = workingWindow(workingHours, date);
   if (!window) return [];
 
+  if (await getClosure(supabase, businessId, date)) return [];
+
   const { data: existingBookings } = await supabase
     .from("bookings")
     .select("booking_time, service:services!inner(duration_minutes)")
@@ -49,6 +53,11 @@ export async function computeTimeSlots(
   const slots: TimeSlotInfo[] = [];
   const step = Math.max(15, durationMinutes);
   for (let m = window.start; m + durationMinutes <= window.end; m += step) {
+    // A slot touching the break restarts the grid right after the break.
+    if (overlapsBreak(window, m, durationMinutes) && window.breakEnd !== null) {
+      m = window.breakEnd - step;
+      continue;
+    }
     if (daysAhead === 0 && m < local.minutes + MIN_LEAD_MINUTES) continue;
     const time = minutesToTime(m);
     slots.push({

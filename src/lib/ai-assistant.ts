@@ -9,6 +9,7 @@ import {
 } from "@/lib/conversation";
 import { DEFAULT_BUSINESS_TIMEZONE } from "@/lib/business-time";
 import { computeTimeSlots } from "@/lib/available-slots";
+import { listUpcomingClosures } from "@/lib/closures";
 import { type WorkingHours } from "@/lib/booking-rules";
 import { createBookingForBusiness, type BookingCustomer } from "@/lib/create-booking";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -60,7 +61,16 @@ function currentDateContext(): string {
 // Builds the system prompt for the AI assistant from the business profile
 // and its live service catalog. The prompt is written in Russian because the
 // assistant talks to Russian-speaking customers.
-export function buildSystemPrompt(user: AiBusiness, services: AiService[]): string {
+export function buildSystemPrompt(
+  user: AiBusiness,
+  services: AiService[],
+  closures: Array<{ date: string; reason: string | null }> = []
+): string {
+  const closuresContext = closures.length
+    ? `\nВыходные и праздничные дни (записи нет):\n${closures
+        .map((c) => `- ${c.date}${c.reason ? ` — ${c.reason}` : ""}`)
+        .join("\n")}\n`
+    : "";
   const servicesContext =
     services
       ?.map(
@@ -81,7 +91,7 @@ ${user?.business_email ? `Email: ${user.business_email}` : ""}
 
 Доступные услуги:
 ${servicesContext}
-
+${closuresContext}
 ВАЖНЫЕ ПРАВИЛА ПОВЕДЕНИЯ:
 1. Приветствие — ТОЛЬКО в самом первом сообщении диалога. Во всех последующих репликах этой же беседы НИКОГДА не начинай ответ с «Здравствуйте», «Добрый день» или подобных приветствий — сразу отвечай по существу. Это правило важнее любых примеров ниже.
 2. Если клиент хочет записаться на услугу, уточни у него: название услуги, желаемую дату (ГГГГ-ММ-ДД), время (ЧЧ:ММ) и имя. У каждой услуги своя длительность (указана в списке) — запись занимает временной интервал от начала до конца услуги и не должна выходить за рабочие часы и пересекаться с другими записями. Когда все данные собраны — обязательно вызови инструмент create_booking.
@@ -209,7 +219,8 @@ export async function generateAiReply(
     .eq("user_id", businessId)
     .eq("active", true);
 
-  const system = buildSystemPrompt(user, services ?? []);
+  const closures = await listUpcomingClosures(supabase, businessId);
+  const system = buildSystemPrompt(user, services ?? [], closures);
 
   // Load previous dialog turns (if any) so the model knows this is a
   // continuation and does not re-greet or lose the booking context.

@@ -8,9 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { ClosuresCard } from "@/components/admin/closures-card";
 import { Save, Bot, ExternalLink, CheckCircle, Bell, Smartphone } from "lucide-react";
 
 interface WorkingHoursDay {
+  break_start?: string | null;
+  break_end?: string | null;
   start: string;
   end: string;
   enabled: boolean;
@@ -237,7 +240,7 @@ export default function SettingsPage() {
     setSettingUpMaxBot(false);
   };
 
-  const updateDay = (day: string, field: keyof WorkingHoursDay, value: string | boolean) => {
+  const updateDay = (day: string, field: keyof WorkingHoursDay, value: string | boolean | null) => {
     setWorkingHours((prev) => ({
       ...prev,
       [day]: { ...prev[day], [field]: value },
@@ -673,7 +676,7 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle>Режим работы</CardTitle>
             <CardDescription>
-              Укажите часы работы. Клиенты смогут записываться только в это время.
+              Укажите часы работы и перерыв. Клиенты смогут записываться только в это время. Не забудьте нажать «Сохранить».
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -703,10 +706,55 @@ export default function SettingsPage() {
                     />
                   </div>
                 )}
+                {workingHours[day]?.enabled && (
+                  <div className="flex w-full flex-wrap items-center gap-2 pl-0 sm:w-auto sm:pl-2">
+                    {workingHours[day]?.break_start ? (
+                      <>
+                        <span className="text-sm text-gray-500">перерыв</span>
+                        <Input
+                          type="time"
+                          value={workingHours[day]?.break_start || ""}
+                          onChange={(e) => updateDay(day, "break_start", e.target.value)}
+                          className="w-28 sm:w-32"
+                        />
+                        <span className="text-gray-500">–</span>
+                        <Input
+                          type="time"
+                          value={workingHours[day]?.break_end || ""}
+                          onChange={(e) => updateDay(day, "break_end", e.target.value)}
+                          className="w-28 sm:w-32"
+                        />
+                        <button
+                          type="button"
+                          className="text-xs text-red-500"
+                          onClick={() => {
+                            updateDay(day, "break_start", null);
+                            updateDay(day, "break_end", null);
+                          }}
+                        >
+                          убрать
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="text-xs text-blue-600"
+                        onClick={() => {
+                          updateDay(day, "break_start", "13:00");
+                          updateDay(day, "break_end", "14:00");
+                        }}
+                      >
+                        + перерыв
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </CardContent>
         </Card>
+
+        <ClosuresCard />
 
         <Card>
           <CardHeader>

@@ -48,11 +48,15 @@ export function BookingsListView() {
   }, []);
 
   const handleStatusUpdate = async (id: string, status: string) => {
-    await fetch("/api/bookings", {
+    const res = await fetch("/api/bookings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      window.alert(data?.error || "Не удалось изменить статус");
+    }
     fetchBookings();
   };
 
@@ -126,6 +130,9 @@ export function BookingsListView() {
                     >
                       {bookingStatusLabel(booking.status)}
                     </Badge>
+                    {booking.status === "cancelled" && booking.cancelled_by === "customer" && (
+                      <span className="text-xs text-gray-500">отменил клиент</span>
+                    )}
                     {booking.status === "pending" && (
                       <div className="flex flex-wrap gap-2">
                         <Button

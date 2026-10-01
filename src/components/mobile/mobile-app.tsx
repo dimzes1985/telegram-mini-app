@@ -44,6 +44,7 @@ interface WorkingHoursDay {
 
 interface PublicBusiness extends SavedBusiness {
   working_hours?: Record<string, WorkingHoursDay> | null;
+  closed_dates?: string[];
 }
 
 const DAY_NAMES = [
@@ -141,6 +142,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
         business_address: info.business_address,
         business_phone: info.business_phone,
         working_hours: info.working_hours,
+        closed_dates: Array.isArray(info.closed_dates) ? info.closed_dates : [],
       };
       setBusiness(next);
       writeJson(SAVED_BUSINESS_KEY, next);
@@ -185,6 +187,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
   }, [selectedDate, selectedService, business]);
 
   const isWorkingDay = (date: Date) => {
+    if (business?.closed_dates?.includes(format(date, "yyyy-MM-dd"))) return false;
     if (!business?.working_hours) return true;
     const hours = business.working_hours[DAY_NAMES[date.getDay()]];
     return !!hours?.enabled;

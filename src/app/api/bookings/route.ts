@@ -7,6 +7,7 @@ import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 import { checkSlotRules, SLOT_RULE_MESSAGES, type WorkingHours } from "@/lib/booking-rules";
 import { type CustomerIdentity } from "@/lib/booking-guard";
 import { placeBooking } from "@/lib/place-booking";
+import { notifyCustomerStatus } from "@/lib/notify-customer";
 import { z } from "zod";
 import {
   parseJsonBody,
@@ -304,13 +305,41 @@ export async function PATCH(req: Request) {
     return NextResponse.json(booking);
   }
 
-  const { data, error } = await supabase
+  const { data: before } = await supabase
     .from("bookings")
-    .update({ status })
+    .select("status")
     .eq("id", id)
     .eq("user_id", user.id)
-    .select()
+    .maybeSingle();
+
+  if (!before) {
+    return NextResponse.json({ error: "Запись не найдена" }, { status: 404 });
+  }
+
+  const update: Record<string, unknown> = { status };
+  if (status === "cancelled") update.cancelled_by = "owner";
+  else if (before.status === "cancelled") update.cancelled_by = null;
+
+  let result = await supabase
+    .from("bookings")
+    .update(update)
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select("*, service:services(title, duration_minutes)")
     .single();
+
+  // Database not migrated yet (no cancelled_by column): retry with status only.
+  if (result.error && (result.error.code === "PGRST204" || result.error.code === "42703")) {
+    result = await supabase
+      .from("bookings")
+      .update({ status })
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .select("*, service:services(title, duration_minutes)")
+      .single();
+  }
+
+  const { data, error } = result;
 
   if (error) {
     // Re-activating a booking (cancelled -> pending/confirmed) is checked
@@ -322,8 +351,15 @@ export async function PATCH(req: Request) {
         { status: 409 }
       );
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Booking status update failed:", error);
+    return NextResponse.json({ error: "Не удалось изменить статус" }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  // Tell the customer (Telegram / MAX) about confirmation or cancellation.
+  let customer_notified = false;
+  if (before.status !== status && (status === "confirmed" || status === "cancelled")) {
+    customer_notified = await notifyCustomerStatus(createAdminClient(), user.id, data, status);
+  }
+
+  return NextResponse.json({ ...data, customer_notified });
 }

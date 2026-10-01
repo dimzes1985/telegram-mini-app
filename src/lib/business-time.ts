@@ -70,3 +70,9 @@ export function daysBetween(from: string, to: string): number {
   };
   return Math.round((toUtc(to) - toUtc(from)) / 86_400_000);
 }
+
+// Calendar date `days` after `date` (YYYY-MM-DD).
+export function addDaysIso(date: string, days: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
