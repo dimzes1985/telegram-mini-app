@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy, ExternalLink, Link2 } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, Link2, QrCode } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 
@@ -11,8 +11,57 @@ interface LinkItem {
   url: string;
 }
 
+// Renders a QR code for the link (PNG data URL) with a download button.
+function QrBlock({ item }: { item: LinkItem }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    import("qrcode")
+      .then((QRCode) =>
+        QRCode.toDataURL(item.url, { width: 480, margin: 2, errorCorrectionLevel: "M" })
+      )
+      .then((url) => {
+        if (!cancelled) setSrc(url);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [item.url]);
+
+  if (failed) return <p className="text-xs text-red-500">Не удалось создать QR-код.</p>;
+  if (!src) return <p className="text-xs text-gray-500">Создаём QR-код…</p>;
+
+  return (
+    <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+      {/* eslint-disable-next-line @next/next/no-img-element -- data URL */}
+      <img
+        src={src}
+        alt={`QR-код: ${item.label}`}
+        className="size-40 rounded-lg border bg-white"
+      />
+      <div className="space-y-2 text-xs text-gray-500">
+        <p>Наведите камеру телефона — откроется ссылка. QR-код можно распечатать и повесить на стойку администратора или дверь.</p>
+        <a
+          href={src}
+          download={`qr-${item.label.toLowerCase().replace(/[^a-zа-я0-9]+/gi, "-")}.png`}
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          <Download className="size-4" />
+          Скачать PNG
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function CopyRow({ item }: { item: LinkItem }) {
   const [copied, setCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
 
   const copy = async () => {
     try {
@@ -45,7 +94,18 @@ function CopyRow({ item }: { item: LinkItem }) {
         >
           <ExternalLink className="size-4" />
         </a>
+        <Button
+          type="button"
+          variant={showQr ? "default" : "outline"}
+          size="sm"
+          onClick={() => setShowQr((v) => !v)}
+          aria-label="Показать QR-код"
+        >
+          <QrCode className="size-4" />
+          <span className="hidden sm:inline">QR</span>
+        </Button>
       </div>
+      {showQr && <QrBlock item={item} />}
     </div>
   );
 }
