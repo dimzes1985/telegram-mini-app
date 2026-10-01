@@ -9,6 +9,7 @@ import {
 } from "@/lib/booking-guard";
 import { insertBooking } from "@/lib/insert-booking";
 import { getClosure } from "@/lib/closures";
+import { loadScheduleSettings } from "@/lib/schedule-settings";
 
 export type BookingSource = "telegram" | "max" | "mobile" | "ai";
 
@@ -81,7 +82,8 @@ export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBooki
     .eq("booking_date", date)
     .neq("status", "cancelled");
 
-  if (findOverlappingSlot(toBookedSlots(existing), time, durationMinutes)) {
+  const { bufferMinutes } = await loadScheduleSettings(supabase, businessId);
+  if (findOverlappingSlot(toBookedSlots(existing), time, durationMinutes, bufferMinutes)) {
     return { ok: false, code: "taken", message: TAKEN_MESSAGE };
   }
 
