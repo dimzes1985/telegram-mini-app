@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Calendar } from "@/components/ui/calendar";
+import { BookingCalendar } from "@/components/booking-calendar";
+import { useTimeSlots } from "@/lib/use-time-slots";
 import { useMessenger } from "@/lib/messenger";
 import { bookingEndTime } from "@/lib/slot";
 import { ArrowLeft, Check } from "lucide-react";
-import { Service, TimeSlot } from "@/types";
-import { addDays, format, startOfDay } from "date-fns";
-import { MAX_BOOKING_DAYS_AHEAD } from "@/lib/booking-rules";
+import { Service } from "@/types";
+import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 
 interface BookingFlowProps {
@@ -44,7 +44,6 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [workingHours, setWorkingHours] = useState<Record<string, WorkingHoursDay> | null>(null);
   const [closedDates, setClosedDates] = useState<string[]>([]);
   const [customerName, setCustomerName] = useState("");
@@ -96,23 +95,13 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
     };
   }, [businessId]);
 
-  // Fetch time slots when date and service are selected
-  useEffect(() => {
-    if (selectedDate && selectedService) {
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
-      const controller = new AbortController();
-      fetch(
-        `/api/timeslots?date=${dateStr}&service_id=${selectedService.id}&business_id=${businessId}`,
-        { signal: controller.signal }
-      )
-        .then((res) => (res.ok ? res.json() : []))
-        .then((data) => setTimeSlots(Array.isArray(data) ? data : []))
-        .catch((e) => {
-          if ((e as Error).name !== "AbortError") setTimeSlots([]);
-        });
-      return () => controller.abort();
-    }
-  }, [selectedDate, selectedService, businessId]);
+  // Free slots, refreshed periodically and when the app is reopened so a
+  // time booked from another messenger disappears without reloading.
+  const { slots: timeSlots, refresh: refreshSlots } = useTimeSlots({
+    businessId,
+    serviceId: selectedService?.id,
+    date: selectedDate,
+  });
 
   const isWorkingDay = (date: Date): boolean => {
     if (closedDates.includes(format(date, "yyyy-MM-dd"))) return false;
@@ -159,6 +148,12 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
       } else {
         webApp.HapticFeedback.notificationOccurred("error");
         setError(data.error || "Что-то пошло не так. Попробуйте ещё раз.");
+        if (res.status === 409) {
+          // Someone else took this time: show fresh slots to pick another.
+          refreshSlots();
+          setSelectedTime(null);
+          setStep("datetime");
+        }
       }
       setLoading(false);
     } catch {
@@ -233,17 +228,16 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
         </p>
 
         <div className="mb-4">
-          <Calendar
-            mode="single"
+          <BookingCalendar
             selected={selectedDate}
             onSelect={(value) => setSelectedDate(value)}
-            disabled={(date: Date) =>
-              date < startOfDay(new Date()) ||
-              date > addDays(startOfDay(new Date()), MAX_BOOKING_DAYS_AHEAD) || !isWorkingDay(date)
-            }
-            className="rounded-md border"
+            isDayAvailable={isWorkingDay}
           />
         </div>
+
+        {error && (
+          <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
 
         {selectedDate && (
           <div>
@@ -263,6 +257,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
                     disabled={!slot.available}
                     onClick={() => {
                       setSelectedTime(slot.time);
+                      setError(null);
                       setStep("confirm");
                       webApp.HapticFeedback.selectionChanged();
                     }}
