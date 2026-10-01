@@ -100,11 +100,19 @@ export async function POST(req: Request) {
 
   const paymentMetadata = payment.metadata || {};
   const expectedStatus = notification.event.replace("payment.", "");
+  // For successful payments also make sure the full plan price was paid in
+  // RUB (the amount is taken from the ЮKassa API, not from the request body).
+  const paidAmount = Number(payment.amount?.value ?? NaN);
+  const amountOk =
+    expectedStatus !== "succeeded" ||
+    (payment.amount?.currency === "RUB" &&
+      Math.abs(paidAmount - PLANS[plan].priceMonthlyRub) < 0.01);
   const verified =
     payment.status === expectedStatus &&
     paymentMetadata.type === metadata.type &&
     paymentMetadata.user_id === userId &&
-    paymentMetadata.plan === plan;
+    paymentMetadata.plan === plan &&
+    amountOk;
 
   if (!verified) {
     return NextResponse.json({ ok: false }, { status: 403 });
@@ -132,10 +140,8 @@ export async function POST(req: Request) {
     // actually saved it (save_payment_method). For one-time fallback payments
     // the method must be ignored, otherwise the renewal cron would try to
     // charge an unsaved method.
-    const savedMethod = notification.object?.payment_method?.saved === true;
-    const paymentMethodId = savedMethod
-      ? notification.object?.payment_method?.id
-      : null;
+    const savedMethod = payment.payment_method?.saved === true;
+    const paymentMethodId = savedMethod ? payment.payment_method?.id ?? null : null;
 
     // Extend the period from the current period end (if any) instead of "now",
     // so a delayed webhook never shortens or drifts the subscription period.
@@ -200,8 +206,8 @@ export async function POST(req: Request) {
         user_id: userId,
         subscription_id: subscriptionId,
         yookassa_payment_id: paymentId,
-        amount: Number(notification.object?.amount?.value || 0),
-        currency: notification.object?.amount?.currency || "RUB",
+        amount: paidAmount,
+        currency: payment.amount?.currency || "RUB",
         status: "succeeded",
       },
       { onConflict: "yookassa_payment_id" }
@@ -243,7 +249,7 @@ export async function POST(req: Request) {
         const targets = await loadOwnerNotifyTargets(admin, userId);
         await notifyOwner(
           targets,
-          `Внимание: автопродление тарифа не удалось (пользователь ${userId}). Подписка переведена в статус past_due.`
+          `⚠️ Не удалось автоматически продлить тариф ${PLANS[plan].name}. Проверьте способ оплаты в разделе «Тарифы», чтобы не потерять доступ.`
         );
       }
     }

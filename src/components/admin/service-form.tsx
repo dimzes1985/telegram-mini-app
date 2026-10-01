@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2 } from "lucide-react";
 import { Service } from "@/types";
 
@@ -30,16 +31,20 @@ export function ServiceForm({ service, onSave, onDelete, trigger }: ServiceFormP
   const [duration, setDuration] = useState(
     service?.duration_minutes?.toString() || "30"
   );
+  const [active, setActive] = useState(service?.active ?? true);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
       await onSave({
         title,
         description,
         price: parseFloat(price),
         duration_minutes: parseInt(duration),
+        active,
       });
       setOpen(false);
       if (!service) {
@@ -47,7 +52,10 @@ export function ServiceForm({ service, onSave, onDelete, trigger }: ServiceFormP
         setDescription("");
         setPrice("");
         setDuration("30");
+        setActive(true);
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось сохранить");
     } finally {
       setLoading(false);
     }
@@ -118,14 +126,37 @@ export function ServiceForm({ service, onSave, onDelete, trigger }: ServiceFormP
                 />
               </div>
             </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label htmlFor="active">Доступна для записи</Label>
+                <p className="text-xs text-gray-500">
+                  Неактивная услуга скрыта от клиентов, но записи сохраняются
+                </p>
+              </div>
+              <Switch id="active" checked={active} onCheckedChange={setActive} />
+            </div>
+            {error && <p className="text-sm text-red-500">{error}</p>}
             <div className="flex justify-between">
               {service && onDelete && (
                 <Button
                   type="button"
                   variant="destructive"
+                  disabled={loading}
                   onClick={async () => {
-                    await onDelete();
-                    setOpen(false);
+                    if (
+                      !window.confirm(
+                        "Удалить услугу? Существующие записи клиентов сохранятся, но записаться на неё больше будет нельзя."
+                      )
+                    ) {
+                      return;
+                    }
+                    setError(null);
+                    try {
+                      await onDelete();
+                      setOpen(false);
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Не удалось удалить");
+                    }
                   }}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />

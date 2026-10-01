@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAiUsage } from "@/lib/ai-usage";
 import { getMaxBotInfo } from "@/lib/max-bot";
-import { parseJsonBody, invalidJsonResponse } from "@/lib/http";
+import { parseJsonBody, invalidJsonResponse, validationErrorResponse } from "@/lib/http";
+import { settingsUpdateSchema } from "@/lib/settings-schema";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getDemoState } from "@/lib/demo-store";
 
@@ -133,10 +134,13 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const body = await parseJsonBody(req);
+  if (body === undefined) return invalidJsonResponse();
+  const parsedBody = settingsUpdateSchema.safeParse(body);
+  if (!parsedBody.success) return validationErrorResponse(parsedBody.error);
+  const raw = parsedBody.data as Record<string, unknown>;
+
   if (!isSupabaseConfigured()) {
-    const body = await parseJsonBody(req);
-    if (body === undefined) return invalidJsonResponse();
-    const raw = body as Record<string, unknown>;
     const settings = getDemoState().settings;
     const keys = [
       "business_name",
@@ -157,9 +161,6 @@ export async function PUT(req: Request) {
     return NextResponse.json({ success: true, demo: true });
   }
 
-  const body = await parseJsonBody(req);
-  if (body === undefined) return invalidJsonResponse();
-  const raw = body as Record<string, unknown>;
   const {
     business_name,
     business_description,

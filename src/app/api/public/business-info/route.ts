@@ -35,10 +35,15 @@ export async function GET(req: Request) {
       "id, business_name, business_description, business_address, business_phone, business_email, working_hours"
     )
     .eq("id", businessId)
-    .single();
+    .maybeSingle();
+
+  if (!error && !data) {
+    return NextResponse.json({ error: "Бизнес не найден" }, { status: 404 });
+  }
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Public API query failed:", error);
+    return NextResponse.json({ error: "Не удалось загрузить данные" }, { status: 500 });
   }
 
   return NextResponse.json(data);

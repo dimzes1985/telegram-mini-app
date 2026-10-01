@@ -48,7 +48,8 @@ export async function GET(req: Request) {
       .maybeSingle();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Public API query failed:", error);
+      return NextResponse.json({ error: "Не удалось загрузить данные" }, { status: 500 });
     }
     return NextResponse.json(data ? [data] : []);
   }
@@ -63,7 +64,8 @@ export async function GET(req: Request) {
     .limit(12);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Public API query failed:", error);
+    return NextResponse.json({ error: "Не удалось загрузить данные" }, { status: 500 });
   }
 
   return NextResponse.json(data ?? []);

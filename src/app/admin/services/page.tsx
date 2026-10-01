@@ -31,29 +31,36 @@ export default function ServicesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleCreate = async (data: Partial<Service>) => {
-    await fetch("/api/services", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+  // Throws with the server message so the form can show it.
+  const request = async (url: string, init: RequestInit) => {
+    const res = await fetch(url, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...(init.headers || {}) },
     });
-    fetchServices();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || "Не удалось сохранить изменения");
+    }
+    return data;
+  };
+
+  const handleCreate = async (data: Partial<Service>) => {
+    await request("/api/services", { method: "POST", body: JSON.stringify(data) });
+    await fetchServices();
   };
 
   const handleUpdate = async (id: string, data: Partial<Service>) => {
-    // For simplicity, delete and recreate (in real app, use PATCH)
-    await fetch(`/api/services?id=${id}`, { method: "DELETE" });
-    await fetch("/api/services", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+    // Update in place: keeps the service id and all its bookings.
+    await request("/api/services", {
+      method: "PATCH",
+      body: JSON.stringify({ id, ...data }),
     });
-    fetchServices();
+    await fetchServices();
   };
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/services?id=${id}`, { method: "DELETE" });
-    fetchServices();
+    await request(`/api/services?id=${id}`, { method: "DELETE" });
+    await fetchServices();
   };
 
   return (

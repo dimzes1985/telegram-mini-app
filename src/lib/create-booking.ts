@@ -1,12 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { notifyOwner } from "@/lib/notify-owner";
-import { bookingEndTime, findOverlappingSlot, toBookedSlots } from "@/lib/slot";
-import { checkSlotRules, SLOT_RULE_MESSAGES, type WorkingHours } from "@/lib/booking-rules";
-import {
-  hasTooManyActiveBookings,
-  TOO_MANY_BOOKINGS_MESSAGE,
-} from "@/lib/booking-guard";
-import { insertBooking } from "@/lib/insert-booking";
+import { placeBooking, formatRuDate } from "@/lib/place-booking";
 import { rateLimit } from "@/lib/rate-limit";
 
 export interface CreateBookingInput {
@@ -27,12 +20,6 @@ export interface BookingCustomer {
 export type CreateBookingResult =
   | { ok: true; message: string; booking: unknown }
   | { ok: false; error: string };
-
-// Formats "2026-08-24" as "24.08.2026".
-function formatDate(isoDate: string): string {
-  const [y, m, d] = isoDate.split("-");
-  return `${d}.${m}.${y}`;
-}
 
 // Creates a booking for a business from parsed natural-language input.
 // Uses the same rules as POST /api/bookings (lib/booking-rules): the service
@@ -94,93 +81,36 @@ export async function createBookingForBusiness(
     };
   }
 
-  const durationMinutes = service.duration_minutes ?? 30;
-
-  const ruleError = checkSlotRules({
+  const result = await placeBooking({
+    supabase,
+    businessId,
+    business,
+    service,
     date: bookingDate,
     time: bookingTime,
-    durationMinutes,
-    workingHours: business.working_hours as WorkingHours | null,
+    customerName,
+    customerPhone: input.customer_phone?.trim().slice(0, 50) || null,
+    customerNotes: input.customer_notes?.trim().slice(0, 1000) || null,
+    source: customer?.source ?? "ai",
+    viaAi: true,
+    identity: customer
+      ? { kind: "messenger", source: customer.source, messengerId: customer.messengerId }
+      : undefined,
   });
-  if (ruleError) {
-    return { ok: false, error: SLOT_RULE_MESSAGES[ruleError] };
-  }
 
-  if (
-    customer &&
-    (await hasTooManyActiveBookings(supabase, businessId, {
-      kind: "messenger",
-      source: customer.source,
-      messengerId: customer.messengerId,
-    }))
-  ) {
-    return { ok: false, error: TOO_MANY_BOOKINGS_MESSAGE };
-  }
-
-  const endTime = bookingEndTime(bookingTime, durationMinutes);
-
-  // Check for bookings that overlap the requested interval.
-  const { data: existing } = await supabase
-    .from("bookings")
-    .select("booking_time, service:services!inner(duration_minutes)")
-    .eq("user_id", businessId)
-    .eq("booking_date", bookingDate)
-    .neq("status", "cancelled");
-
-  if (findOverlappingSlot(toBookedSlots(existing), bookingTime, durationMinutes)) {
+  if (!result.ok) {
     return {
       ok: false,
-      error: "Это время уже занято. Предложите клиенту другое время.",
+      error:
+        result.code === "taken"
+          ? "Это время уже занято. Предложите клиенту другое время."
+          : result.message,
     };
   }
 
-  const { data: booking, error } = await insertBooking(
-    supabase,
-    {
-      service_id: service.id,
-      user_id: businessId,
-      booking_date: bookingDate,
-      booking_time: bookingTime,
-      customer_name: customerName,
-      customer_phone: input.customer_phone?.trim().slice(0, 50) || null,
-      customer_notes: input.customer_notes?.trim().slice(0, 1000) || null,
-      status: "pending",
-    },
-    {
-      source: customer?.source ?? "ai",
-      customer_messenger_id: customer?.messengerId ?? null,
-    }
-  );
-
-  if (error) {
-    // 23505: unique start index; 23P01: bookings_no_overlap exclusion
-    // constraint. Both mean a concurrent request took the slot.
-    if (error.code === "23505" || error.code === "23P01") {
-      return {
-        ok: false,
-        error: "Это время уже занято. Предложите клиенту другое время.",
-      };
-    }
-    console.error("AI booking insert failed:", error);
-    return { ok: false, error: "Не удалось создать запись, попробуйте ещё раз." };
-  }
-
-  // Notify the owner. notifyOwner never rejects, so a failed notification
-  // cannot fail the booking.
-  await notifyOwner(business, [
-    "🔔 Новая запись!",
-    "",
-    `🛠 Услуга: ${service.title}`,
-    `📅 Дата: ${formatDate(bookingDate)}`,
-    `🕒 Время: ${bookingTime}–${endTime}`,
-    `👤 Клиент: ${customerName}`,
-    `📞 Телефон: ${input.customer_phone || "не указан"}`,
-    "📲 Источник: AI-ассистент",
-  ].join("\n"));
-
   return {
     ok: true,
-    booking,
-    message: `Запись создана: ${service.title}, ${formatDate(bookingDate)} с ${bookingTime} до ${endTime}.`,
+    booking: result.booking,
+    message: `Запись создана: ${service.title}, ${formatRuDate(bookingDate)} с ${bookingTime} до ${result.endTime}.`,
   };
 }
