@@ -12,15 +12,34 @@ interface ChatInterfaceProps {
   businessId: string;
 }
 
+// Human-readable reason why the assistant did not answer. The server replies
+// with JSON { error } and an HTTP status; useChat puts the body in message.
+function chatErrorText(error: Error, inMessenger: boolean): string {
+  const raw = error.message || "";
+  if (!inMessenger || /initData/i.test(raw)) {
+    return "Чат с AI-ассистентом работает внутри Telegram или MAX. Откройте приложение через бота или запишитесь на вкладке «Запись».";
+  }
+  if (/limit|Too many/i.test(raw)) {
+    return "Слишком много сообщений. Подождите минуту и попробуйте снова.";
+  }
+  if (/no (MAX )?bot configured/i.test(raw)) {
+    return "Чат пока не настроен владельцем. Запишитесь на вкладке «Запись».";
+  }
+  return "AI-ассистент сейчас не отвечает. Попробуйте ещё раз чуть позже или запишитесь на вкладке «Запись».";
+}
+
 export function ChatInterface({ businessId }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const { webApp, initData, platform } = useMessenger();
-  const transport = new DefaultChatTransport({
-    api: "/api/chat",
-    body: () => ({ businessId, initData, platform }),
-  });
 
-  const { messages, sendMessage, status } = useChat({
+  // The messenger (Telegram / MAX) is detected asynchronously, so initData is
+  // empty on the first render, and useChat keeps the transport from its first
+  // render. The auth fields are therefore passed with every sendMessage call
+  // (always the current values) instead of being baked into the transport;
+  // otherwise every message went out without initData and was rejected (401).
+  const [transport] = useState(() => new DefaultChatTransport({ api: "/api/chat" }));
+
+  const { messages, sendMessage, status, error, clearError } = useChat({
     transport,
   });
 
@@ -34,8 +53,9 @@ export function ChatInterface({ businessId }: ChatInterfaceProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
+    if (error) clearError();
     webApp.HapticFeedback.impactOccurred("light");
-    sendMessage({ text: input });
+    sendMessage({ text: input }, { body: { businessId, initData, platform } });
     setInput("");
   };
 
@@ -85,6 +105,11 @@ export function ChatInterface({ businessId }: ChatInterfaceProps) {
                 <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
               </div>
             </div>
+          </div>
+        )}
+        {error && !isLoading && (
+          <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+            {chatErrorText(error, Boolean(initData))}
           </div>
         )}
         <div ref={messagesEndRef} />
