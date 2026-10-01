@@ -10,7 +10,7 @@ import { verifyMaxInitData } from "@/lib/max-auth";
 import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 import { getAiUsage, incrementAiUsage } from "@/lib/ai-usage";
 import { getAiModel } from "@/lib/ai";
-import { buildSystemPrompt, makeBookingTool } from "@/lib/ai-assistant";
+import { buildSystemPrompt, makeBookingTool, makeSlotsTool } from "@/lib/ai-assistant";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { DEMO_USER_ID, buildDemoChatReply } from "@/lib/demo-store";
 
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 // How many model turns a single reply may take (user turn + tool call + final
 // text). Default is 1, which would stop after the tool call without the
 // confirmation text.
-const MAX_REPLY_STEPS = 3;
+const MAX_REPLY_STEPS = 5;
 
 function jsonError(message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
@@ -200,6 +200,7 @@ export async function POST(req: Request) {
     system: systemPrompt,
     messages: modelMessages,
     tools: {
+      get_available_slots: makeSlotsTool(supabase, businessId),
       create_booking: makeBookingTool(supabase, businessId, {
         source: isMax ? "max" : "telegram",
         messengerId: String(messengerUserId),

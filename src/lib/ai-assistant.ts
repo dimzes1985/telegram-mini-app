@@ -8,6 +8,8 @@ import {
   type ConversationChannel,
 } from "@/lib/conversation";
 import { DEFAULT_BUSINESS_TIMEZONE } from "@/lib/business-time";
+import { computeTimeSlots } from "@/lib/available-slots";
+import { type WorkingHours } from "@/lib/booking-rules";
 import { createBookingForBusiness, type BookingCustomer } from "@/lib/create-booking";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -84,7 +86,8 @@ ${servicesContext}
 1. Приветствие — ТОЛЬКО в самом первом сообщении диалога. Во всех последующих репликах этой же беседы НИКОГДА не начинай ответ с «Здравствуйте», «Добрый день» или подобных приветствий — сразу отвечай по существу. Это правило важнее любых примеров ниже.
 2. Если клиент хочет записаться на услугу, уточни у него: название услуги, желаемую дату (ГГГГ-ММ-ДД), время (ЧЧ:ММ) и имя. У каждой услуги своя длительность (указана в списке) — запись занимает временной интервал от начала до конца услуги и не должна выходить за рабочие часы и пересекаться с другими записями. Когда все данные собраны — обязательно вызови инструмент create_booking.
 3. Когда клиент говорит «завтра», «послезавтра», «в понедельник» и т.п., рассчитывай дату строго от сегодняшней даты, приведённой выше. Сегодняшняя дата и текущее время — всегда в контексте выше.
-4. Подтверждай запись клиенту ТОЛЬКО после того, как инструмент create_booking вернул «ЗАПИСЬ СОЗДАНА» — и обязательно называй клиенту время начала и окончания (например: «записала вас на 26 августа с 14:00 до 15:00»). Если инструмент вернул «ОШИБКА» (время занято, не вписывается в рабочие часы, мы не работаем в этот день и т.п.) — объясни причину клиенту и предложи другие варианты.`;
+4. Если клиент спрашивает, когда есть свободное время, или не назвал точное время, — вызови инструмент get_available_slots и предложи 3–5 свободных вариантов. Не придумывай свободное время сам.
+5. Подтверждай запись клиенту ТОЛЬКО после того, как инструмент create_booking вернул «ЗАПИСЬ СОЗДАНА» — и обязательно называй клиенту время начала и окончания (например: «записала вас на 26 августа с 14:00 до 15:00»). Если инструмент вернул «ОШИБКА» (время занято, не вписывается в рабочие часы, мы не работаем в этот день и т.п.) — объясни причину клиенту и предложи другие варианты.`;
 }
 
 // The booking tool lets the assistant actually create a booking at the exact
@@ -122,6 +125,48 @@ export function makeBookingTool(
   });
 }
 
+// Lets the assistant look up real free times instead of guessing.
+export function makeSlotsTool(supabase: SupabaseClient, businessId: string) {
+  return tool({
+    description:
+      "Получить свободное время для записи на услугу в конкретный день. Вызывай, когда клиент спрашивает о свободном времени или ещё не выбрал точное время.",
+    inputSchema: zodSchema(
+      z.object({
+        service_title: z.string().describe("Название услуги из списка"),
+        date: z.string().describe("Дата в формате ГГГГ-ММ-ДД"),
+      })
+    ),
+    execute: async ({ service_title, date }) => {
+      const { data: services } = await supabase
+        .from("services")
+        .select("title, duration_minutes")
+        .eq("user_id", businessId)
+        .eq("active", true);
+      const wanted = service_title.trim().toLowerCase();
+      const service = (services ?? []).find((s) => s.title.trim().toLowerCase() === wanted);
+      if (!service) {
+        const list = (services ?? []).map((s) => `«${s.title}»`).join(", ");
+        return `ОШИБКА: услуга «${service_title}» не найдена. Доступные услуги: ${list || "нет"}.`;
+      }
+      const { data: business } = await supabase
+        .from("users")
+        .select("working_hours")
+        .eq("id", businessId)
+        .maybeSingle();
+      const slots = await computeTimeSlots(supabase, {
+        businessId,
+        date: date.trim(),
+        durationMinutes: service.duration_minutes ?? 30,
+        workingHours: business?.working_hours as WorkingHours | null,
+      });
+      const free = slots.filter((s) => s.available).map((s) => s.time);
+      return free.length
+        ? `СВОБОДНО ${date}: ${free.join(", ")}`
+        : `НЕТ СВОБОДНОГО ВРЕМЕНИ ${date} (выходной, всё занято или дата недоступна). Предложи другой день.`;
+    },
+  });
+}
+
 export type AiReplyResult =
   | { ok: true; text: string }
   | { ok: false; reason: "not_found" | "quota" | "error"; message: string };
@@ -129,7 +174,7 @@ export type AiReplyResult =
 // How many model turns a single reply may take (user turn + tool call + final
 // text). Default is 1, which would stop after the tool call without the
 // confirmation text.
-const MAX_REPLY_STEPS = 3;
+const MAX_REPLY_STEPS = 5;
 
 // Generates a complete (non-streaming) AI reply for a business.
 // Used by messenger bots that send the answer straight into the chat.
@@ -184,6 +229,7 @@ export async function generateAiReply(
       system,
       messages: [...history, ...messages],
       tools: {
+        get_available_slots: makeSlotsTool(supabase, businessId),
         create_booking: makeBookingTool(
           supabase,
           businessId,
