@@ -437,48 +437,50 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
 
       {screen === "datetime" && (
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8">
-          <p className="mb-3 text-sm text-blue-100">
-            {selectedService?.title} — {selectedService?.price} ₽
-          </p>
-          {error && <p className="mb-3 text-sm text-rose-300">{error}</p>}
-          <div className="rounded-3xl bg-white p-3">
-            <BookingCalendar
-              selected={selectedDate}
-              onSelect={(value) => setSelectedDate(value)}
-              isDayAvailable={isWorkingDay}
-              className="border-0"
-            />
-          </div>
-          {selectedDate && (
-            <div className="mt-4">
-              <p className="mb-2 flex items-center gap-1 text-sm font-medium text-white">
-                <Clock className="size-4" />
-                Свободное время
-              </p>
-              {timeSlots.length === 0 ? (
-                <p className="py-6 text-center text-sm text-blue-200">Нет свободных слотов</p>
-              ) : (
-                <div className="grid grid-cols-4 gap-2">
-                  {timeSlots.map((slot) => (
-                    <Button
-                      key={slot.time}
-                      variant={selectedTime === slot.time ? "default" : "secondary"}
-                      disabled={!slot.available}
-                      className="h-10 rounded-xl bg-white text-slate-900 disabled:opacity-40"
-                      onClick={() => {
-                        setSelectedTime(slot.time);
-                        setError(null);
-                        haptic();
-                        setScreen("confirm");
-                      }}
-                    >
-                      {slot.time}
-                    </Button>
-                  ))}
-                </div>
-              )}
+          <div className="mx-auto w-full max-w-md">
+            <p className="mb-3 text-sm text-blue-100">
+              {selectedService?.title} — {selectedService?.price} ₽
+            </p>
+            {error && <p className="mb-3 text-sm text-rose-300">{error}</p>}
+            <div className="mx-auto max-w-md rounded-3xl bg-white p-3 text-slate-900">
+              <BookingCalendar
+                selected={selectedDate}
+                onSelect={(value) => setSelectedDate(value)}
+                isDayAvailable={isWorkingDay}
+                className="border-0"
+              />
             </div>
-          )}
+            {selectedDate && (
+              <div className="mt-4">
+                <p className="mb-2 flex items-center gap-1 text-sm font-medium text-white">
+                  <Clock className="size-4" />
+                  Свободное время
+                </p>
+                {timeSlots.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-blue-200">Нет свободных слотов</p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2">
+                    {timeSlots.map((slot) => (
+                      <Button
+                        key={slot.time}
+                        variant={selectedTime === slot.time ? "default" : "secondary"}
+                        disabled={!slot.available}
+                        className="h-10 rounded-xl bg-white text-slate-900 disabled:opacity-40"
+                        onClick={() => {
+                          setSelectedTime(slot.time);
+                          setError(null);
+                          haptic();
+                          setScreen("confirm");
+                        }}
+                      >
+                        {slot.time}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

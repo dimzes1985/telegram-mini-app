@@ -42,7 +42,7 @@ export function BookingCalendar({
         date < today || date > lastDay || (isDayAvailable ? !isDayAvailable(date) : false)
       }
       className={cn(
-        "w-full rounded-md border [--cell-size:--spacing(10)] [&_.rdp-day]:aspect-auto [&_.rdp-day]:h-11 [&_.rdp-caption_label]:text-base [&_.rdp-caption_label]:capitalize",
+        "mx-auto w-full max-w-md rounded-md border bg-white text-slate-900 [&_.rdp-weekday]:text-slate-500 [--cell-size:--spacing(10)] [&_.rdp-day]:aspect-auto [&_.rdp-day]:h-11 [&_.rdp-caption_label]:text-base [&_.rdp-caption_label]:capitalize",
         className
       )}
       classNames={{ root: "w-full" }}
