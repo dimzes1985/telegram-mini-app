@@ -36,6 +36,8 @@ const createBookingSchema = z
     customer_notes: z.string().trim().max(1000).nullable().optional(),
     initData: z.string().optional().default(""),
     platform: z.enum(["telegram", "max", "mobile"]).default("telegram"),
+    // Chosen staff member; null/absent = any free staff member.
+    staff_id: uuidString.nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.platform !== "mobile" && !data.initData) {
@@ -79,12 +81,17 @@ export async function GET() {
     );
   }
 
-  const { data, error } = await supabase
-    .from("bookings")
-    .select("*, service:services(*)")
-    .eq("user_id", user.id)
-    .order("booking_date", { ascending: false })
-    .order("booking_time", { ascending: false });
+  const query = (select: string) =>
+    supabase
+      .from("bookings")
+      .select(select)
+      .eq("user_id", user.id)
+      .order("booking_date", { ascending: false })
+      .order("booking_time", { ascending: false });
+
+  let { data, error } = await query("*, service:services(*), staff:staff(name)");
+  // Staff table not created yet (migration-step6-staff.sql): load without it.
+  if (error) ({ data, error } = await query("*, service:services(*)"));
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -153,6 +160,7 @@ export async function POST(req: Request) {
     customer_notes,
     initData,
     platform,
+    staff_id,
   } = parsed.data;
 
   // Cheap per-IP limit first, before touching the database.
@@ -265,6 +273,7 @@ export async function POST(req: Request) {
     customerNotes: customer_notes,
     source: platform,
     identity,
+    staffId: staff_id ?? null,
     select: "*, service:services(*)",
   });
 
@@ -273,7 +282,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: result.message }, { status });
   }
 
-  return NextResponse.json(result.booking, { status: 201 });
+  return NextResponse.json(
+    { ...result.booking, staff: result.staff },
+    { status: 201 }
+  );
 }
 
 // PATCH update booking status

@@ -32,8 +32,23 @@ export interface Booking {
   cancelled_by?: "customer" | "owner" | null;
   created_at: string;
   updated_at: string;
+  staff_id?: string | null;
   // Joined data
   service?: Service;
+  staff?: { name: string } | null;
+}
+
+export interface Staff {
+  id: string;
+  name: string;
+  description: string | null;
+  service_ids: string[];
+  working_hours: Record<
+    string,
+    { start: string; end: string; enabled: boolean; break_start?: string | null; break_end?: string | null }
+  > | null;
+  active: boolean;
+  sort_order: number;
 }
 
 export interface TimeSlot {

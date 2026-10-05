@@ -181,6 +181,7 @@ export function CalendarView() {
                     </div>
                     <p className="text-sm text-gray-600">
                       {booking.service?.title}
+                      {booking.staff?.name ? ` · ${booking.staff.name}` : ""}
                     </p>
                     <p className="text-sm text-gray-500">
                       {booking.booking_time}
