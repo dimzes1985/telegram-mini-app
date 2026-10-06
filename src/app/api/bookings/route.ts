@@ -40,6 +40,10 @@ const createBookingSchema = z
     staff_id: uuidString.nullable().optional(),
     // Temporary hold of the chosen time (POST /api/holds).
     hold_token: z.string().max(100).nullable().optional(),
+    // Consent to personal data processing (checkbox in the form).
+    consent: z.literal(true, {
+      error: "Подтвердите согласие на обработку персональных данных",
+    }),
   })
   .superRefine((data, ctx) => {
     if (data.platform !== "mobile" && !data.initData) {
@@ -278,6 +282,7 @@ export async function POST(req: Request) {
     identity,
     staffId: staff_id ?? null,
     holdToken: hold_token ?? null,
+    consentGiven: true,
     select: "*, service:services(*)",
   });
 

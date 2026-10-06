@@ -158,6 +158,14 @@ export default function LoginPage() {
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Создание аккаунта..." : "Создать аккаунт"}
                 </Button>
+                <p className="text-xs text-gray-500 text-center">
+                  Создавая аккаунт, вы даёте согласие на обработку персональных данных и
+                  принимаете{" "}
+                  <a href="/privacy" target="_blank" rel="noopener" className="underline">
+                    политику конфиденциальности
+                  </a>
+                  .
+                </p>
                 {demoMode && (
                   <p className="text-xs text-gray-500 text-center">
                     Без Supabase регистрация тоже откроет демо-панель.

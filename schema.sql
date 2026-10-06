@@ -603,3 +603,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_booking_holds_slot_unique
 ALTER TABLE booking_holds ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON booking_holds TO service_role;
 
+
+-- ============ Consent (migration-step8-consent.sql) ============
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS consent_at TIMESTAMPTZ;
