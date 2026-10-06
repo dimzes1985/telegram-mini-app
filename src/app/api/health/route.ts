@@ -7,5 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const configured = isUpstashConfigured();
   const redis = configured ? ((await pingUpstash()) ? "ok" : "error") : "not_configured";
-  return NextResponse.json({ ok: true, redis });
+  const sentry =
+    process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN ? "on" : "off";
+  return NextResponse.json({ ok: true, redis, sentry });
 }

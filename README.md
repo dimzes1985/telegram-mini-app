@@ -191,3 +191,7 @@ npm start
 - `migration-max.sql` — поддержка MAX-бота (`max_bot_token`, `max_bot_username`, `max_bot_webhook_secret`, `max_bot_webhook_set`).
 - `migration-slot-overlap-trigger.sql` — проверка пересечения слотов триггером (BEFORE INSERT); недостаточна при параллельных запросах, применять до следующей.
 - `migration-slot-exclusion-constraint.sql` — атомарная защита от двойного бронирования через ограничение `EXCLUDE USING gist` по `(user_id, tsrange(booked_start, booked_end))`; обязательна для продакшена (требует расширение `btree_gist`).
+
+### Мониторинг ошибок (Sentry)
+
+Добавьте в Vercel переменную `NEXT_PUBLIC_SENTRY_DSN` (DSN проекта Sentry) и сделайте Redeploy. Без неё Sentry выключен.
