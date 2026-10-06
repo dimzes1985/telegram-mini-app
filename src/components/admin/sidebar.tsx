@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Calendar, Settings, Briefcase, CreditCard, Users } from "lucide-react";
+import {
+  LayoutDashboard,
+  Calendar,
+  Settings,
+  Briefcase,
+  CreditCard,
+  Users,
+  BarChart3,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -29,6 +37,14 @@ const navItems = [
     short: "Записи",
     href: "/admin/bookings",
     icon: Calendar,
+  },
+  {
+    label: "Статистика",
+    short: "Статистика",
+    href: "/admin/stats",
+    icon: BarChart3,
+    // Reached from the dashboard on phones (the bottom bar has no room).
+    desktopOnly: true,
   },
   {
     label: "Оплата",
@@ -73,7 +89,7 @@ export function Sidebar() {
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   active
                     ? "bg-gray-800 text-white"
-                    : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                    : "text-gray-400 hover:bg-gray-800 hover:text-white",
                 )}
               >
                 <item.icon className="h-5 w-5" />
@@ -87,25 +103,30 @@ export function Sidebar() {
       {/* Mobile bottom navigation */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
         <div className="grid grid-cols-6">
-          {navItems.map((item) => {
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex flex-col items-center gap-1 px-1 py-2 text-[11px] font-medium transition-colors",
-                  active ? "text-blue-600" : "text-gray-500"
-                )}
-              >
-                <item.icon
-                  className={cn("h-5 w-5", active ? "text-blue-600" : "text-gray-400")}
-                />
-                <span className="truncate">{item.short}</span>
-              </Link>
-            );
-          })}
+          {navItems
+            .filter((item) => !("desktopOnly" in item && item.desktopOnly))
+            .map((item) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "flex flex-col items-center gap-1 px-1 py-2 text-[11px] font-medium transition-colors",
+                    active ? "text-blue-600" : "text-gray-500",
+                  )}
+                >
+                  <item.icon
+                    className={cn(
+                      "h-5 w-5",
+                      active ? "text-blue-600" : "text-gray-400",
+                    )}
+                  />
+                  <span className="truncate">{item.short}</span>
+                </Link>
+              );
+            })}
         </div>
       </nav>
     </>
