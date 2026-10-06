@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, CheckCircle } from "lucide-react";
+import { Calendar, Clock, CheckCircle, BarChart3, ChevronRight } from "lucide-react";
+import { nowInTimeZone } from "@/lib/business-time";
 import { bookingStatusLabel } from "@/lib/labels";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getDemoState } from "@/lib/demo-store";
@@ -36,7 +37,7 @@ export default async function AdminDashboard() {
   const confirmedBookings =
     allBookings?.filter((b) => b.status === "confirmed").length || 0;
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = nowInTimeZone().date;
   const todayBookings =
     allBookings?.filter((b) => b.booking_date === today).length || 0;
 
@@ -125,6 +126,17 @@ export default async function AdminDashboard() {
           </Card>
         </Link>
       </div>
+
+      <Link
+        href="/admin/stats"
+        className="mb-6 flex items-center justify-between rounded-xl border bg-white px-4 py-3 transition-shadow hover:shadow-md sm:mb-8"
+      >
+        <span className="flex items-center gap-2 font-medium">
+          <BarChart3 className="h-5 w-5 text-blue-500" />
+          Статистика: выручка, отмены, популярные услуги
+        </span>
+        <ChevronRight className="h-5 w-5 text-gray-400" />
+      </Link>
 
       {/* Recent Bookings */}
       <Card>
