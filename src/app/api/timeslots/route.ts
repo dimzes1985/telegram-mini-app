@@ -11,6 +11,7 @@ const timeslotsQuerySchema = z.object({
   service_id: z.string().min(1),
   business_id: z.string().min(1),
   staff_id: z.string().uuid().nullable().optional(),
+  hold_token: z.string().max(100).nullable().optional(),
 });
 
 // GET available time slots for a specific date and service
@@ -21,6 +22,7 @@ export async function GET(req: Request) {
     service_id: searchParams.get("service_id"),
     business_id: searchParams.get("business_id"),
     staff_id: searchParams.get("staff_id") || null,
+    hold_token: searchParams.get("hold_token") || null,
   });
 
   if (!parsed.success) {
@@ -30,7 +32,7 @@ export async function GET(req: Request) {
     );
   }
 
-  const { date, service_id, business_id, staff_id } = parsed.data;
+  const { date, service_id, business_id, staff_id, hold_token } = parsed.data;
 
   if (!isSupabaseConfigured()) {
     const slots = demoTimeSlots(date, service_id);
@@ -75,6 +77,7 @@ export async function GET(req: Request) {
     workingHours: user?.working_hours as WorkingHours | null,
     serviceId: service_id,
     staffId: staff_id ?? null,
+    holdToken: hold_token ?? null,
   });
 
   return NextResponse.json(slots);

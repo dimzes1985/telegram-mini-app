@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookingCalendar } from "@/components/booking-calendar";
 import { useTimeSlots } from "@/lib/use-time-slots";
+import { useSlotHold } from "@/lib/use-slot-hold";
+import { HoldCountdown } from "@/components/hold-countdown";
 import { useStaffForService } from "@/lib/use-staff";
 import { StaffPicker } from "@/components/staff-picker";
 import { useMessenger } from "@/lib/messenger";
@@ -56,6 +58,9 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
   const [customerPhone, setCustomerPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Time being reserved right now (POST /api/holds in flight).
+  const [holdingTime, setHoldingTime] = useState<string | null>(null);
+  const { hold, reserve, release, forget } = useSlotHold(businessId);
 
   // Fetch services. If the flow was opened with a preselected service
   // (e.g. from the services catalog), jump straight to the calendar step.
@@ -108,6 +113,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
     serviceId: selectedService?.id,
     date: selectedDate,
     staffId: selectedStaffId,
+    holdToken: hold?.token ?? null,
   });
 
   const staffList = useStaffForService(businessId, selectedService?.id);
@@ -149,6 +155,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
           booking_time: selectedTime,
           customer_name: customerName,
           customer_phone: customerPhone || null,
+          hold_token: hold?.token ?? null,
           initData,
           platform,
         }),
@@ -159,13 +166,14 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
       if (res.ok) {
         webApp.HapticFeedback.notificationOccurred("success");
         setBookedStaffName(data?.staff?.name ?? null);
+        forget();
         setStep("success");
       } else {
         webApp.HapticFeedback.notificationOccurred("error");
         setError(data.error || "Что-то пошло не так. Попробуйте ещё раз.");
         if (res.status === 409) {
           // Someone else took this time: show fresh slots to pick another.
-          refreshSlots();
+          void release().then(refreshSlots);
           setSelectedTime(null);
           setStep("datetime");
         }
@@ -174,6 +182,36 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
     } catch {
       setLoading(false);
     }
+  };
+
+  // Picking a time reserves it for a few minutes while the form is filled.
+  const pickTime = async (time: string) => {
+    if (!selectedService || !selectedDate) return;
+    webApp.HapticFeedback.selectionChanged();
+    setError(null);
+    setHoldingTime(time);
+    const result = await reserve({
+      serviceId: selectedService.id,
+      staffId: selectedStaffId,
+      date: format(selectedDate, "yyyy-MM-dd"),
+      time,
+    });
+    setHoldingTime(null);
+    if (!result.ok) {
+      webApp.HapticFeedback.notificationOccurred("error");
+      setError(result.error);
+      refreshSlots();
+      return;
+    }
+    setSelectedTime(time);
+    setStep("confirm");
+  };
+
+  // Back from the form: the held time is released.
+  const backToDatetime = () => {
+    void release().then(refreshSlots);
+    setError(null);
+    setStep("datetime");
   };
 
   // Step 1: Select Service
@@ -282,16 +320,11 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
                   <Button
                     key={slot.time}
                     variant={selectedTime === slot.time ? "default" : "outline"}
-                    disabled={!slot.available}
-                    onClick={() => {
-                      setSelectedTime(slot.time);
-                      setError(null);
-                      setStep("confirm");
-                      webApp.HapticFeedback.selectionChanged();
-                    }}
+                    disabled={!slot.available || holdingTime !== null}
+                    onClick={() => void pickTime(slot.time)}
                     className="text-sm"
                   >
-                    {slot.time}
+                    {holdingTime === slot.time ? "…" : slot.time}
                   </Button>
                 ))}
               </div>
@@ -307,13 +340,14 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
     return (
       <div className="p-4">
         <button
-          onClick={() => setStep("datetime")}
+          onClick={backToDatetime}
           className="flex items-center text-gray-600 mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
           Назад
         </button>
         <h2 className="text-xl font-bold mb-4">Подтвердить запись</h2>
+        {hold && <HoldCountdown expiresAt={hold.expiresAt} className="mb-4" />}
 
         <Card className="mb-4">
           <CardContent className="p-4">

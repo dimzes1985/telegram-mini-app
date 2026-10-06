@@ -10,6 +10,7 @@ import {
 import { insertBooking } from "@/lib/insert-booking";
 import { getClosure } from "@/lib/closures";
 import { loadScheduleSettings } from "@/lib/schedule-settings";
+import { deleteHold, getActiveHold, loadActiveHolds, sameTime } from "@/lib/holds";
 import {
   listActiveStaff,
   rowsForStaff,
@@ -44,6 +45,8 @@ export interface PlaceBookingInput {
   identity?: CustomerIdentity;
   // Chosen staff member; null/undefined = any free staff member.
   staffId?: string | null;
+  // Token of the customer's temporary hold of this time (see lib/holds.ts).
+  holdToken?: string | null;
   select?: string;
 }
 
@@ -69,13 +72,28 @@ export function formatRuDate(isoDate: string): string {
   return `${d}.${m}.${y}`;
 }
 
-// The single booking pipeline used by every channel (mini-app, mobile web,
-// AI assistant): slot rules -> per-customer limit -> overlap check -> insert
-// (DB constraints guard races) -> owner notification.
-export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBookingResult> {
-  const { supabase, businessId, business, service, date, time, source, identity } = input;
-  const durationMinutes = service.duration_minutes ?? 30;
-  const businessHours = (business.working_hours ?? null) as WorkingHours | null;
+export type AvailabilityResult =
+  | { ok: true; free: Array<StaffMember | null> }
+  | { ok: false; code: "rules" | "taken"; message: string };
+
+// Who can take a booking at this time: slot rules (working hours, closures,
+// lead time) per candidate, then overlap with bookings and other customers'
+// holds. Returns the free candidates in order: `null` for a business
+// without staff, otherwise staff members.
+export async function findFreeResources(params: {
+  supabase: SupabaseClient;
+  businessId: string;
+  businessHours: WorkingHours | null;
+  serviceId: string;
+  durationMinutes: number;
+  date: string;
+  time: string;
+  // Chosen staff member; null/undefined = any free staff member.
+  staffId?: string | null;
+  // The customer's own hold, which must not block them.
+  holdToken?: string | null;
+}): Promise<AvailabilityResult> {
+  const { supabase, businessId, businessHours, durationMinutes, date, time } = params;
   const isClosedDate = Boolean(await getClosure(supabase, businessId, date));
 
   const allStaff = await listActiveStaff(supabase, businessId);
@@ -85,13 +103,13 @@ export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBooki
   // staff member, or every staff member performing the service.
   let candidates: Array<StaffMember | null> = [null];
   if (staffMode) {
-    let qualified = staffForService(allStaff, service.id);
-    if (input.staffId) qualified = qualified.filter((s) => s.id === input.staffId);
+    let qualified = staffForService(allStaff, params.serviceId);
+    if (params.staffId) qualified = qualified.filter((s) => s.id === params.staffId);
     if (qualified.length === 0) {
       return { ok: false, code: "rules", message: STAFF_NOT_FOUND_MESSAGE };
     }
     candidates = qualified;
-  } else if (input.staffId) {
+  } else if (params.staffId) {
     return { ok: false, code: "rules", message: STAFF_NOT_FOUND_MESSAGE };
   }
 
@@ -116,10 +134,6 @@ export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBooki
     };
   }
 
-  if (identity && (await hasTooManyActiveBookings(supabase, businessId, identity))) {
-    return { ok: false, code: "too_many", message: TOO_MANY_BOOKINGS_MESSAGE };
-  }
-
   const { data: existing } = await supabase
     .from("bookings")
     .select(
@@ -130,7 +144,8 @@ export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBooki
     .eq("user_id", businessId)
     .eq("booking_date", date)
     .neq("status", "cancelled");
-  const rows = (existing ?? []) as unknown as StaffBookedRow[];
+  const holds = await loadActiveHolds(supabase, businessId, date, params.holdToken);
+  const rows = [...((existing ?? []) as unknown as StaffBookedRow[]), ...holds];
 
   const { bufferMinutes } = await loadScheduleSettings(supabase, businessId);
   const free = fitting.filter((member) => {
@@ -140,6 +155,50 @@ export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBooki
   if (free.length === 0) {
     return { ok: false, code: "taken", message: TAKEN_MESSAGE };
   }
+  return { ok: true, free };
+}
+
+// The single booking pipeline used by every channel (mini-app, mobile web,
+// AI assistant): slot rules -> overlap check (bookings and other customers'
+// holds) -> per-customer limit -> insert (DB constraints guard races) ->
+// owner notification.
+export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBookingResult> {
+  const { supabase, businessId, business, service, date, time, source, identity } = input;
+  const durationMinutes = service.duration_minutes ?? 30;
+  const businessHours = (business.working_hours ?? null) as WorkingHours | null;
+
+  // The customer's own hold for exactly this booking (if still valid).
+  const hold = await getActiveHold(supabase, input.holdToken);
+  const ownHold =
+    hold &&
+    hold.user_id === businessId &&
+    hold.service_id === service.id &&
+    hold.booking_date === date &&
+    sameTime(hold.booking_time, time)
+      ? hold
+      : null;
+
+  const availability = await findFreeResources({
+    supabase,
+    businessId,
+    businessHours,
+    serviceId: service.id,
+    durationMinutes,
+    date,
+    time,
+    staffId: input.staffId,
+    holdToken: ownHold?.token ?? null,
+  });
+  if (!availability.ok) return availability;
+
+  if (identity && (await hasTooManyActiveBookings(supabase, businessId, identity))) {
+    return { ok: false, code: "too_many", message: TOO_MANY_BOOKINGS_MESSAGE };
+  }
+
+  // The staff member reserved by the hold goes first.
+  const free = [...availability.free].sort(
+    (a, b) => Number(b?.id === ownHold?.staff_id) - Number(a?.id === ownHold?.staff_id)
+  );
 
   // Try free candidates in order; a DB conflict (concurrent booking) moves on
   // to the next free staff member.
@@ -183,6 +242,7 @@ export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBooki
   if (!booking) {
     return { ok: false, code: "taken", message: TAKEN_MESSAGE };
   }
+  if (input.holdToken) await deleteHold(supabase, input.holdToken);
 
   const endTime = bookingEndTime(time, durationMinutes);
 

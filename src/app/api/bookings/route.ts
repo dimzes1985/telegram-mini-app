@@ -38,6 +38,8 @@ const createBookingSchema = z
     platform: z.enum(["telegram", "max", "mobile"]).default("telegram"),
     // Chosen staff member; null/absent = any free staff member.
     staff_id: uuidString.nullable().optional(),
+    // Temporary hold of the chosen time (POST /api/holds).
+    hold_token: z.string().max(100).nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.platform !== "mobile" && !data.initData) {
@@ -161,6 +163,7 @@ export async function POST(req: Request) {
     initData,
     platform,
     staff_id,
+    hold_token,
   } = parsed.data;
 
   // Cheap per-IP limit first, before touching the database.
@@ -274,6 +277,7 @@ export async function POST(req: Request) {
     source: platform,
     identity,
     staffId: staff_id ?? null,
+    holdToken: hold_token ?? null,
     select: "*, service:services(*)",
   });
 
