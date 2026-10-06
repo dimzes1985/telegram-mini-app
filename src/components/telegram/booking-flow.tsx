@@ -9,6 +9,7 @@ import { BookingCalendar } from "@/components/booking-calendar";
 import { useTimeSlots } from "@/lib/use-time-slots";
 import { useSlotHold } from "@/lib/use-slot-hold";
 import { HoldCountdown } from "@/components/hold-countdown";
+import { ConsentCheckbox } from "@/components/legal/consent-checkbox";
 import { useStaffForService } from "@/lib/use-staff";
 import { StaffPicker } from "@/components/staff-picker";
 import { useMessenger } from "@/lib/messenger";
@@ -56,6 +57,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
   const [closedDates, setClosedDates] = useState<string[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Time being reserved right now (POST /api/holds in flight).
@@ -156,6 +158,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
           customer_name: customerName,
           customer_phone: customerPhone || null,
           hold_token: hold?.token ?? null,
+          consent,
           initData,
           platform,
         }),
@@ -406,10 +409,11 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
               placeholder="+7 (900) 000-00-00"
             />
           </div>
+          <ConsentCheckbox checked={consent} onChange={setConsent} />
           <Button
             className="w-full"
             onClick={handleBooking}
-            disabled={!customerName || loading}
+            disabled={!customerName || !consent || loading}
           >
             {loading ? "Бронируем..." : "Подтвердить запись"}
           </Button>

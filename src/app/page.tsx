@@ -811,6 +811,7 @@ export default function Home() {
             <a href="#features" className="hover:text-gray-900">Возможности</a>
             <a href="#pricing" className="hover:text-gray-900">Тарифы</a>
             <a href="#contact" className="hover:text-gray-900">Контакты</a>
+            <Link href="/privacy" className="hover:text-gray-900">Конфиденциальность</Link>
             <Link href="/login" className="hover:text-gray-900">Войти</Link>
           </nav>
         </div>

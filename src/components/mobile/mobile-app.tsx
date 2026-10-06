@@ -24,6 +24,7 @@ import { BookingCalendar } from "@/components/booking-calendar";
 import { useTimeSlots } from "@/lib/use-time-slots";
 import { useSlotHold } from "@/lib/use-slot-hold";
 import { HoldCountdown } from "@/components/hold-countdown";
+import { ConsentCheckbox } from "@/components/legal/consent-checkbox";
 import { useStaffForService } from "@/lib/use-staff";
 import { StaffPicker } from "@/components/staff-picker";
 import { bookingEndTime } from "@/lib/slot";
@@ -89,6 +90,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
   const [customerPhone, setCustomerPhone] = useState(
     () => readJson<SavedCustomer>(CUSTOMER_KEY)?.phone || ""
   );
+  const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Time being reserved right now (POST /api/holds in flight).
@@ -221,6 +223,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
           customer_name: customerName,
           customer_phone: customerPhone || null,
           hold_token: hold?.token ?? null,
+          consent,
           platform: "mobile",
         }),
       });
@@ -592,9 +595,12 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
                 placeholder="+7 900 000-00-00"
               />
             </div>
+            <ConsentCheckbox tone="dark" checked={consent} onChange={setConsent} />
             <Button
               className="h-12 w-full rounded-2xl text-base"
-              disabled={!customerName || customerPhone.replace(/\D/g, "").length < 10 || loading}
+              disabled={
+                !customerName || customerPhone.replace(/\D/g, "").length < 10 || !consent || loading
+              }
               onClick={() => void handleBooking()}
             >
               {loading ? "Бронируем..." : "Подтвердить запись"}

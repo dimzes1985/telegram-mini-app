@@ -4,6 +4,7 @@ import { useRef, useEffect, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Button } from "@/components/ui/button";
+import { openLegalLink } from "@/components/legal/consent-checkbox";
 import { Input } from "@/components/ui/input";
 import { useMessenger } from "@/lib/messenger";
 import { Send } from "lucide-react";
@@ -129,6 +130,12 @@ export function ChatInterface({ businessId }: ChatInterfaceProps) {
             <Send className="h-4 w-4" />
           </Button>
         </form>
+        <p className="mt-2 text-center text-[11px] leading-snug text-gray-400">
+          Отправляя сообщения, вы даёте{" "}
+          <a href="/consent" target="_blank" rel="noopener" className="underline" onClick={openLegalLink}>
+            согласие на обработку персональных данных
+          </a>
+        </p>
       </div>
     </div>
   );

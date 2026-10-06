@@ -47,6 +47,8 @@ export interface PlaceBookingInput {
   staffId?: string | null;
   // Token of the customer's temporary hold of this time (see lib/holds.ts).
   holdToken?: string | null;
+  // Customer ticked the personal data consent checkbox.
+  consentGiven?: boolean;
   select?: string;
 }
 
@@ -221,6 +223,7 @@ export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBooki
       {
         source,
         customer_messenger_id: identity?.kind === "messenger" ? identity.messengerId : null,
+        ...(input.consentGiven ? { consent_at: new Date().toISOString() } : {}),
       },
       input.select
     );

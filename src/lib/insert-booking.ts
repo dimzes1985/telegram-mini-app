@@ -15,6 +15,8 @@ export interface BookingInsert {
 export interface BookingInsertExtras {
   source?: string | null;
   customer_messenger_id?: string | null;
+  // When the customer ticked the personal data consent (migration-step8).
+  consent_at?: string | null;
 }
 
 // PostgREST: column missing from the schema cache (migration not applied).
