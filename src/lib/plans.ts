@@ -23,8 +23,8 @@ export const PLANS: Record<Plan, PlanConfig> = {
     name: "Pro",
     priceMonthlyRub: 1490,
     aiMessagesPerMonth: 1000,
-    maxServices: 50,
-    maxStaff: 5,
+    maxServices: 20,
+    maxStaff: 3,
   },
   business: {
     id: "business",
