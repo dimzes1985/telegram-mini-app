@@ -15,6 +15,8 @@ const loginSchema = z.object({
   password: z.string().optional(),
   action: z.enum(["login", "signup", "demo"]).default("login"),
   business_name: z.string().trim().max(200).optional(),
+  // Signup: the user ticked "I accept the offer and the privacy policy".
+  accept_terms: z.boolean().optional(),
 });
 
 function demoResponse() {
@@ -34,7 +36,7 @@ export async function POST(req: Request) {
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) return validationErrorResponse(parsed.error);
 
-  const { email, password, action, business_name } = parsed.data;
+  const { email, password, action, business_name, accept_terms } = parsed.data;
 
   if (!isSupabaseConfigured() || action === "demo") {
     return demoResponse();
@@ -62,10 +64,22 @@ export async function POST(req: Request) {
     if (!email || !password) {
       return NextResponse.json({ error: "Укажите почту и пароль" }, { status: 400 });
     }
+    if (accept_terms !== true) {
+      return NextResponse.json(
+        { error: "Примите договор-оферту и политику конфиденциальности" },
+        { status: 400 }
+      );
+    }
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { business_name: business_name || "My Business" } },
+      options: {
+        data: {
+          business_name: business_name || "My Business",
+          // Proof of accepting the offer (stored in the auth user metadata).
+          terms_accepted_at: new Date().toISOString(),
+        },
+      },
     });
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });

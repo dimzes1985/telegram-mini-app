@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [businessName, setBusinessName] = useState("");
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [demoMode, setDemoMode] = useState(false);
@@ -121,6 +122,7 @@ export default function LoginPage() {
                     email,
                     password,
                     business_name: businessName,
+                    accept_terms: acceptTerms,
                   });
                 }}
                 className="space-y-4 mt-4"
@@ -154,18 +156,28 @@ export default function LoginPage() {
                     placeholder="••••••••"
                   />
                 </div>
+                <label className="flex cursor-pointer items-start gap-2 text-xs leading-snug text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={acceptTerms}
+                    onChange={(e) => setAcceptTerms(e.target.checked)}
+                    className="mt-0.5 size-4 shrink-0 accent-blue-600"
+                  />
+                  <span>
+                    Я принимаю{" "}
+                    <a href="/terms" target="_blank" rel="noopener" className="text-blue-600 underline">
+                      договор-оферту
+                    </a>
+                    , даю согласие на обработку персональных данных и принимаю{" "}
+                    <a href="/privacy" target="_blank" rel="noopener" className="text-blue-600 underline">
+                      политику конфиденциальности
+                    </a>
+                  </span>
+                </label>
                 {error && <p className="text-sm text-red-500">{error}</p>}
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full" disabled={loading || !acceptTerms}>
                   {loading ? "Создание аккаунта..." : "Создать аккаунт"}
                 </Button>
-                <p className="text-xs text-gray-500 text-center">
-                  Создавая аккаунт, вы даёте согласие на обработку персональных данных и
-                  принимаете{" "}
-                  <a href="/privacy" target="_blank" rel="noopener" className="underline">
-                    политику конфиденциальности
-                  </a>
-                  .
-                </p>
                 {demoMode && (
                   <p className="text-xs text-gray-500 text-center">
                     Без Supabase регистрация тоже откроет демо-панель.

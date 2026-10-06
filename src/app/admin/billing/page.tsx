@@ -66,6 +66,8 @@ function BillingContent() {
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
+  // Offer + auto-renewal consent, required before paying.
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [error, setError] = useState("");
   const [unbinding, setUnbinding] = useState(false);
   const [unbindError, setUnbindError] = useState("");
@@ -91,7 +93,7 @@ function BillingContent() {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, accept_terms: acceptTerms }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -320,6 +322,23 @@ function BillingContent() {
         </Card>
       )}
 
+      <label className="mb-4 flex cursor-pointer items-start gap-2 rounded-lg border bg-white p-3 text-sm leading-snug text-gray-600">
+        <input
+          type="checkbox"
+          checked={acceptTerms}
+          onChange={(e) => setAcceptTerms(e.target.checked)}
+          className="mt-0.5 size-4 shrink-0 accent-blue-600"
+        />
+        <span>
+          Я принимаю{" "}
+          <a href="/terms" target="_blank" rel="noopener" className="text-blue-600 underline">
+            договор-оферту
+          </a>{" "}
+          и согласен на автоматическое ежемесячное списание стоимости тарифа с сохранённой
+          карты. Отключить автопродление можно в любой момент на этой странице.
+        </span>
+      </label>
+
       <div className="grid gap-4 sm:gap-6 md:grid-cols-3">
         {plans.map((plan) => {
           const isCurrent = plan.id === currentPlan;
@@ -365,7 +384,7 @@ function BillingContent() {
                 ) : isPaid ? (
                   <Button
                     className="w-full"
-                    disabled={checkingOut !== null}
+                    disabled={checkingOut !== null || !acceptTerms}
                     onClick={() => handleCheckout(plan.id)}
                   >
                     {checkingOut === plan.id ? (

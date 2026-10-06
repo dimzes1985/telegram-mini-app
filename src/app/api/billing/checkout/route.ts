@@ -15,6 +15,10 @@ export const dynamic = "force-dynamic";
 
 const checkoutSchema = z.object({
   plan: z.enum(["pro", "business"]),
+  // "I accept the offer and agree to monthly auto-renewal" checkbox.
+  accept_terms: z.literal(true, {
+    error: "Примите договор-оферту и условия автопродления",
+  }),
 });
 
 // POST /api/billing/checkout - create a payment for upgrading the plan
@@ -49,6 +53,12 @@ export async function POST(req: Request) {
   if (!parsed.success) return validationErrorResponse(parsed.error);
 
   const { plan } = parsed.data;
+
+  // Proof of accepting the offer and auto-renewal (auth user metadata).
+  const acceptedAt = new Date().toISOString();
+  await supabase.auth
+    .updateUser({ data: { terms_accepted_at: acceptedAt, autopay_accepted_at: acceptedAt } })
+    .catch(() => null);
   const planConfig = PLANS[plan as Plan];
 
   if (!planConfig) {
