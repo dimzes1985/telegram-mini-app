@@ -9,6 +9,7 @@ import {
 } from "@/lib/booking-rules";
 import { getClosure } from "@/lib/closures";
 import { findOverlappingSlot, minutesToTime, toBookedSlots, type BookedSlot } from "@/lib/slot";
+import { loadActiveHolds } from "@/lib/holds";
 import { gridStepMinutes, loadScheduleSettings } from "@/lib/schedule-settings";
 import {
   listActiveStaff,
@@ -82,6 +83,8 @@ export async function computeTimeSlots(
     workingHours: WorkingHours | null | undefined;
     serviceId?: string;
     staffId?: string | null;
+    // The customer's own hold, which must not show as taken for them.
+    holdToken?: string | null;
   }
 ): Promise<TimeSlotInfo[]> {
   const { businessId, date, durationMinutes, workingHours } = params;
@@ -98,6 +101,8 @@ export async function computeTimeSlots(
   const notBefore = daysAhead === 0 ? local.minutes + MIN_LEAD_MINUTES : null;
 
   const allStaff = await listActiveStaff(supabase, businessId);
+  // Times other customers are filling the form for count as occupied.
+  const holds = await loadActiveHolds(supabase, businessId, date, params.holdToken);
 
   // No staff configured: the business is a single resource (old behaviour).
   if (allStaff.length === 0) {
@@ -112,7 +117,7 @@ export async function computeTimeSlots(
       date,
       durationMinutes,
       workingHours,
-      bookedSlots: toBookedSlots(existingBookings),
+      bookedSlots: toBookedSlots([...(existingBookings ?? []), ...holds]),
       step,
       bufferMinutes: settings.bufferMinutes,
       notBefore,
@@ -129,7 +134,7 @@ export async function computeTimeSlots(
     .eq("user_id", businessId)
     .eq("booking_date", date)
     .neq("status", "cancelled");
-  const rows = (data ?? []) as unknown as StaffBookedRow[];
+  const rows = [...((data ?? []) as unknown as StaffBookedRow[]), ...holds];
 
   const grids = candidates.map((member) =>
     buildSlotGrid({

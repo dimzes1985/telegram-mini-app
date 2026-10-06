@@ -17,8 +17,11 @@ export function useTimeSlots(params: {
   date: Date | undefined;
   // Chosen staff member; null/undefined = any staff member.
   staffId?: string | null;
+  // The customer's own hold: their held time is not shown as taken.
+  holdToken?: string | null;
 }) {
   const { businessId, serviceId, date } = params;
+  const holdToken = params.holdToken ?? "";
   const staffId = params.staffId ?? "";
   const dateStr = date ? format(date, "yyyy-MM-dd") : null;
   const key =
@@ -38,6 +41,7 @@ export function useTimeSlots(params: {
       `/api/timeslots?date=${dateStr}&service_id=${encodeURIComponent(serviceId)}` +
       `&business_id=${encodeURIComponent(businessId)}` +
       (staffId ? `&staff_id=${encodeURIComponent(staffId)}` : "") +
+      (holdToken ? `&hold_token=${encodeURIComponent(holdToken)}` : "") +
       `&_=${Date.now()}`;
     fetch(url, { signal: controller.signal, cache: "no-store" })
       .then((res) => (res.ok ? res.json() : []))
@@ -46,7 +50,7 @@ export function useTimeSlots(params: {
         if ((e as Error).name !== "AbortError") setLoaded({ key: requestKey, slots: [] });
       });
     return () => controller.abort();
-  }, [businessId, serviceId, dateStr, staffId, version]);
+  }, [businessId, serviceId, dateStr, staffId, holdToken, version]);
 
   useEffect(() => {
     if (!businessId || !serviceId || !dateStr) return;

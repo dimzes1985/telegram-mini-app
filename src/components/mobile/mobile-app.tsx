@@ -22,6 +22,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookingCalendar } from "@/components/booking-calendar";
 import { useTimeSlots } from "@/lib/use-time-slots";
+import { useSlotHold } from "@/lib/use-slot-hold";
+import { HoldCountdown } from "@/components/hold-countdown";
 import { useStaffForService } from "@/lib/use-staff";
 import { StaffPicker } from "@/components/staff-picker";
 import { bookingEndTime } from "@/lib/slot";
@@ -89,6 +91,9 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Time being reserved right now (POST /api/holds in flight).
+  const [holdingTime, setHoldingTime] = useState<string | null>(null);
+  const { hold, reserve, release, forget } = useSlotHold(business?.id);
   const [installHint] = useState(() => {
     if (typeof window === "undefined") return { show: false, ios: false };
     const ua = window.navigator.userAgent;
@@ -179,6 +184,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
     serviceId: selectedService?.id,
     date: selectedDate,
     staffId: selectedStaffId,
+    holdToken: hold?.token ?? null,
   });
 
   const staffList = useStaffForService(business?.id, selectedService?.id);
@@ -214,6 +220,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
           booking_time: selectedTime,
           customer_name: customerName,
           customer_phone: customerPhone || null,
+          hold_token: hold?.token ?? null,
           platform: "mobile",
         }),
       });
@@ -223,7 +230,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
         setError(data.error || "Не удалось записаться");
         if (res.status === 409) {
           // Someone else took this time: show fresh slots to pick another.
-          refreshSlots();
+          void release().then(refreshSlots);
           setSelectedTime(null);
           setScreen("datetime");
         }
@@ -234,6 +241,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
         addManageToken(business.id, data.manage_token);
       }
       setBookedStaffName(data?.staff?.name ?? null);
+      forget();
       haptic("success");
       setScreen("success");
     } catch {
@@ -241,6 +249,29 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
     } finally {
       setLoading(false);
     }
+  }
+
+  // Picking a time reserves it for a few minutes while the form is filled.
+  async function pickTime(time: string) {
+    if (!selectedService || !selectedDate) return;
+    haptic();
+    setError(null);
+    setHoldingTime(time);
+    const result = await reserve({
+      serviceId: selectedService.id,
+      staffId: selectedStaffId,
+      date: format(selectedDate, "yyyy-MM-dd"),
+      time,
+    });
+    setHoldingTime(null);
+    if (!result.ok) {
+      haptic("error");
+      setError(result.error);
+      refreshSlots();
+      return;
+    }
+    setSelectedTime(time);
+    setScreen("confirm");
   }
 
   function resetBooking() {
@@ -353,7 +384,11 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
                 return;
               }
               if (screen === "datetime") setScreen("services");
-              if (screen === "confirm") setScreen("datetime");
+              if (screen === "confirm") {
+                void release().then(refreshSlots);
+                setError(null);
+                setScreen("datetime");
+              }
               if (screen === "success") resetBooking();
               if (screen === "my") setScreen("services");
             }}
@@ -492,16 +527,11 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
                       <Button
                         key={slot.time}
                         variant={selectedTime === slot.time ? "default" : "secondary"}
-                        disabled={!slot.available}
+                        disabled={!slot.available || holdingTime !== null}
                         className="h-10 rounded-xl bg-white text-slate-900 disabled:opacity-40"
-                        onClick={() => {
-                          setSelectedTime(slot.time);
-                          setError(null);
-                          haptic();
-                          setScreen("confirm");
-                        }}
+                        onClick={() => void pickTime(slot.time)}
                       >
-                        {slot.time}
+                        {holdingTime === slot.time ? "…" : slot.time}
                       </Button>
                     ))}
                   </div>
@@ -514,6 +544,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
 
       {screen === "confirm" && (
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-8">
+          {hold && <HoldCountdown expiresAt={hold.expiresAt} className="mb-3" />}
           <Card className="mb-4 rounded-3xl border-0">
             <CardContent className="space-y-2 p-4 text-sm">
               <div className="flex justify-between">
