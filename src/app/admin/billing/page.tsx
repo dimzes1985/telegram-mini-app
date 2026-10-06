@@ -14,6 +14,7 @@ interface PlanInfo {
   price_monthly_rub: number;
   ai_messages_per_month: number;
   max_services: number | null;
+  max_staff?: number | null;
 }
 
 interface BillingStatus {
@@ -40,6 +41,7 @@ const FREE_PLAN: PlanInfo = {
   price_monthly_rub: 0,
   ai_messages_per_month: 50,
   max_services: 3,
+  max_staff: 1,
 };
 
 const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
@@ -345,6 +347,16 @@ function BillingContent() {
                     <Check className="h-4 w-4 text-green-500" />
                     {plan.ai_messages_per_month.toLocaleString("ru-RU")} AI-сообщений в месяц
                   </li>
+                  {plan.max_staff !== undefined && (
+                    <li className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-green-500" />
+                      {plan.max_staff === null
+                        ? "Безлимитно мастеров"
+                        : plan.max_staff === 1
+                          ? "1 мастер"
+                          : `До ${plan.max_staff} мастеров`}
+                    </li>
+                  )}
                 </ul>
                 {isCurrent ? (
                   <Button variant="outline" disabled className="w-full">
