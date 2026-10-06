@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { placeBooking, formatRuDate } from "@/lib/place-booking";
 import { rateLimit } from "@/lib/rate-limit";
+import { findStaffByName, listActiveStaff, staffForService } from "@/lib/staff";
 
 export interface CreateBookingInput {
   service_title: string;
@@ -9,6 +10,8 @@ export interface CreateBookingInput {
   customer_name: string;
   customer_phone?: string | null;
   customer_notes?: string | null;
+  // Staff member chosen by the customer (name); empty = any free one.
+  staff_name?: string | null;
 }
 
 // Verified messenger identity of the customer the assistant is talking to.
@@ -81,7 +84,22 @@ export async function createBookingForBusiness(
     };
   }
 
+  let staffId: string | null = null;
+  if (input.staff_name?.trim()) {
+    const qualified = staffForService(await listActiveStaff(supabase, businessId), service.id);
+    const member = findStaffByName(qualified, input.staff_name);
+    if (!member) {
+      const names = qualified.map((m) => m.name).join(", ");
+      return {
+        ok: false,
+        error: `Мастер «${input.staff_name}» не выполняет эту услугу или не найден. Мастера для этой услуги: ${names || "нет"}.`,
+      };
+    }
+    staffId = member.id;
+  }
+
   const result = await placeBooking({
+    staffId,
     supabase,
     businessId,
     business,
@@ -111,6 +129,8 @@ export async function createBookingForBusiness(
   return {
     ok: true,
     booking: result.booking,
-    message: `Запись создана: ${service.title}, ${formatRuDate(bookingDate)} с ${bookingTime} до ${result.endTime}.`,
+    message: `Запись создана: ${service.title}, ${formatRuDate(bookingDate)} с ${bookingTime} до ${result.endTime}${
+      result.staff ? `, мастер: ${result.staff.name}` : ""
+    }.`,
   };
 }

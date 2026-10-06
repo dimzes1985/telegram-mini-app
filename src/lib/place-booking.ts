@@ -10,6 +10,14 @@ import {
 import { insertBooking } from "@/lib/insert-booking";
 import { getClosure } from "@/lib/closures";
 import { loadScheduleSettings } from "@/lib/schedule-settings";
+import {
+  listActiveStaff,
+  rowsForStaff,
+  staffForService,
+  staffWorkingHours,
+  type StaffBookedRow,
+  type StaffMember,
+} from "@/lib/staff";
 
 export type BookingSource = "telegram" | "max" | "mobile" | "ai";
 
@@ -34,11 +42,18 @@ export interface PlaceBookingInput {
   // Booking was made by the AI assistant on behalf of the customer.
   viaAi?: boolean;
   identity?: CustomerIdentity;
+  // Chosen staff member; null/undefined = any free staff member.
+  staffId?: string | null;
   select?: string;
 }
 
 export type PlaceBookingResult =
-  | { ok: true; booking: Record<string, unknown> | null; endTime: string }
+  | {
+      ok: true;
+      booking: Record<string, unknown> | null;
+      endTime: string;
+      staff: { id: string; name: string } | null;
+    }
   | {
       ok: false;
       code: "rules" | "too_many" | "taken" | "error";
@@ -46,6 +61,7 @@ export type PlaceBookingResult =
     };
 
 const TAKEN_MESSAGE = "Это время уже занято. Выберите другое.";
+const STAFF_NOT_FOUND_MESSAGE = "Этот мастер не выполняет выбранную услугу или недоступен.";
 
 // Formats "2026-08-24" as "24.08.2026".
 export function formatRuDate(isoDate: string): string {
@@ -59,16 +75,45 @@ export function formatRuDate(isoDate: string): string {
 export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBookingResult> {
   const { supabase, businessId, business, service, date, time, source, identity } = input;
   const durationMinutes = service.duration_minutes ?? 30;
+  const businessHours = (business.working_hours ?? null) as WorkingHours | null;
+  const isClosedDate = Boolean(await getClosure(supabase, businessId, date));
 
-  const ruleError = checkSlotRules({
-    date,
-    time,
-    durationMinutes,
-    workingHours: (business.working_hours ?? null) as WorkingHours | null,
-    isClosedDate: Boolean(await getClosure(supabase, businessId, date)),
+  const allStaff = await listActiveStaff(supabase, businessId);
+  const staffMode = allStaff.length > 0;
+
+  // Who can take this booking: the business itself (no staff), the chosen
+  // staff member, or every staff member performing the service.
+  let candidates: Array<StaffMember | null> = [null];
+  if (staffMode) {
+    let qualified = staffForService(allStaff, service.id);
+    if (input.staffId) qualified = qualified.filter((s) => s.id === input.staffId);
+    if (qualified.length === 0) {
+      return { ok: false, code: "rules", message: STAFF_NOT_FOUND_MESSAGE };
+    }
+    candidates = qualified;
+  } else if (input.staffId) {
+    return { ok: false, code: "rules", message: STAFF_NOT_FOUND_MESSAGE };
+  }
+
+  // Working-hours rules per candidate (staff may have personal schedules).
+  let firstRuleError: ReturnType<typeof checkSlotRules> = null;
+  const fitting = candidates.filter((member) => {
+    const ruleError = checkSlotRules({
+      date,
+      time,
+      durationMinutes,
+      workingHours: staffWorkingHours(member, businessHours),
+      isClosedDate,
+    });
+    if (ruleError && !firstRuleError) firstRuleError = ruleError;
+    return !ruleError;
   });
-  if (ruleError) {
-    return { ok: false, code: "rules", message: SLOT_RULE_MESSAGES[ruleError] };
+  if (fitting.length === 0) {
+    return {
+      ok: false,
+      code: "rules",
+      message: SLOT_RULE_MESSAGES[firstRuleError ?? "outside_hours"],
+    };
   }
 
   if (identity && (await hasTooManyActiveBookings(supabase, businessId, identity))) {
@@ -77,47 +122,66 @@ export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBooki
 
   const { data: existing } = await supabase
     .from("bookings")
-    .select("booking_time, service:services!inner(duration_minutes)")
+    .select(
+      staffMode
+        ? "booking_time, staff_id, service:services!inner(duration_minutes)"
+        : "booking_time, service:services!inner(duration_minutes)"
+    )
     .eq("user_id", businessId)
     .eq("booking_date", date)
     .neq("status", "cancelled");
+  const rows = (existing ?? []) as unknown as StaffBookedRow[];
 
   const { bufferMinutes } = await loadScheduleSettings(supabase, businessId);
-  if (findOverlappingSlot(toBookedSlots(existing), time, durationMinutes, bufferMinutes)) {
+  const free = fitting.filter((member) => {
+    const occupied = member ? rowsForStaff(rows, member.id) : rows;
+    return !findOverlappingSlot(toBookedSlots(occupied), time, durationMinutes, bufferMinutes);
+  });
+  if (free.length === 0) {
     return { ok: false, code: "taken", message: TAKEN_MESSAGE };
   }
 
-  const { data: booking, error } = await insertBooking(
-    supabase,
-    {
-      service_id: service.id,
-      user_id: businessId,
-      booking_date: date,
-      booking_time: time,
-      customer_name: input.customerName,
-      customer_phone: input.customerPhone || null,
-      customer_notes: input.customerNotes || null,
-      status: "pending",
-    },
-    {
-      source,
-      customer_messenger_id: identity?.kind === "messenger" ? identity.messengerId : null,
-    },
-    input.select
-  );
-
-  if (error) {
+  // Try free candidates in order; a DB conflict (concurrent booking) moves on
+  // to the next free staff member.
+  let booking: Record<string, unknown> | null = null;
+  let chosen: StaffMember | null = null;
+  for (const member of free) {
+    const { data, error } = await insertBooking(
+      supabase,
+      {
+        service_id: service.id,
+        user_id: businessId,
+        booking_date: date,
+        booking_time: time,
+        customer_name: input.customerName,
+        customer_phone: input.customerPhone || null,
+        customer_notes: input.customerNotes || null,
+        status: "pending",
+        ...(member ? { staff_id: member.id } : {}),
+      },
+      {
+        source,
+        customer_messenger_id: identity?.kind === "messenger" ? identity.messengerId : null,
+      },
+      input.select
+    );
+    if (!error) {
+      booking = data;
+      chosen = member;
+      break;
+    }
     // 23505: unique start index; 23P01: bookings_no_overlap exclusion
     // constraint. Both mean a concurrent request took the slot.
-    if (error.code === "23505" || error.code === "23P01") {
-      return { ok: false, code: "taken", message: TAKEN_MESSAGE };
-    }
+    if (error.code === "23505" || error.code === "23P01") continue;
     console.error("Booking insert failed:", error);
     return {
       ok: false,
       code: "error",
       message: "Не удалось создать запись, попробуйте ещё раз.",
     };
+  }
+  if (!booking) {
+    return { ok: false, code: "taken", message: TAKEN_MESSAGE };
   }
 
   const endTime = bookingEndTime(time, durationMinutes);
@@ -128,6 +192,7 @@ export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBooki
     `🛠 Услуга: ${service.title}`,
     `📅 Дата: ${formatRuDate(date)}`,
     `🕒 Время: ${time}–${endTime}`,
+    ...(chosen ? [`💇 Мастер: ${chosen.name}`] : []),
     `👤 Клиент: ${input.customerName}`,
     `📞 Телефон: ${input.customerPhone || "не указан"}`,
   ];
@@ -141,5 +206,10 @@ export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBooki
   // Awaited so serverless does not drop it; notifyOwner never rejects.
   await notifyOwner(business, lines.join("\n"));
 
-  return { ok: true, booking, endTime };
+  return {
+    ok: true,
+    booking,
+    endTime,
+    staff: chosen ? { id: chosen.id, name: chosen.name } : null,
+  };
 }

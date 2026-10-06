@@ -9,6 +9,7 @@ export interface BookingInsert {
   customer_phone: string | null;
   customer_notes: string | null;
   status: "pending" | "confirmed";
+  staff_id?: string;
 }
 
 export interface BookingInsertExtras {

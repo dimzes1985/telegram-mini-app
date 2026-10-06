@@ -105,6 +105,7 @@ export function BookingsListView() {
                     <h3 className="font-semibold">{booking.customer_name}</h3>
                     <p className="text-sm text-gray-600">
                       {booking.service?.title}
+                      {booking.staff?.name ? ` · ${booking.staff.name}` : ""}
                     </p>
                     <p className="text-sm text-gray-500">
                       {booking.booking_date} в {booking.booking_time}

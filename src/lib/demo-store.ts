@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import type { Booking, Service } from "@/types";
+import type { StaffMember } from "@/lib/staff";
 
 export const DEMO_USER_ID = "00000000-0000-4000-8000-000000000001";
 export const DEMO_COOKIE = "slot_demo";
@@ -94,6 +95,7 @@ interface DemoState {
   services: Service[];
   bookings: Booking[];
   contacts: DemoContact[];
+  staff: StaffMember[];
 }
 
 declare global {
@@ -123,6 +125,7 @@ function createState(): DemoState {
     },
     services: [seedServiceA, seedServiceB, seedServiceC],
     contacts: [],
+    staff: [],
     bookings: [
       {
         id: randomUUID(),
@@ -163,6 +166,9 @@ export function getDemoState(): DemoState {
   const state = globalThis.__slotDemoStore;
   if (!state.contacts) {
     state.contacts = [];
+  }
+  if (!state.staff) {
+    state.staff = [];
   }
   return state;
 }

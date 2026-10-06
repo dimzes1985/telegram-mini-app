@@ -12,6 +12,7 @@ import { computeTimeSlots } from "@/lib/available-slots";
 import { listUpcomingClosures } from "@/lib/closures";
 import { type WorkingHours } from "@/lib/booking-rules";
 import { createBookingForBusiness, type BookingCustomer } from "@/lib/create-booking";
+import { findStaffByName, listActiveStaff, staffForService } from "@/lib/staff";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
@@ -25,6 +26,7 @@ export interface AiBusiness {
 }
 
 export interface AiService {
+  id?: string;
   title: string;
   description?: string | null;
   price: number;
@@ -58,14 +60,49 @@ function currentDateContext(): string {
   return `Сегодня: ${get("year")}-${get("month")}-${get("day")} (${weekday}). Текущее время: ${time}.`;
 }
 
+export interface AiStaff {
+  name: string;
+  description?: string | null;
+  // Service titles; null = all services.
+  services: string[] | null;
+}
+
+// Staff list for the prompt, with the services each staff member performs.
+export async function loadAiStaff(
+  supabase: SupabaseClient,
+  businessId: string,
+  services: AiService[]
+): Promise<AiStaff[]> {
+  const staff = await listActiveStaff(supabase, businessId);
+  return staff.map((member) => ({
+    name: member.name,
+    description: member.description,
+    services:
+      member.service_ids.length === 0
+        ? null
+        : services.filter((s) => s.id && member.service_ids.includes(s.id)).map((s) => s.title),
+  }));
+}
+
 // Builds the system prompt for the AI assistant from the business profile
 // and its live service catalog. The prompt is written in Russian because the
 // assistant talks to Russian-speaking customers.
 export function buildSystemPrompt(
   user: AiBusiness,
   services: AiService[],
-  closures: Array<{ date: string; reason: string | null }> = []
+  closures: Array<{ date: string; reason: string | null }> = [],
+  staff: AiStaff[] = []
 ): string {
+  const staffContext = staff.length
+    ? `\nМастера (клиент может выбрать мастера или записаться к любому свободному):\n${staff
+        .map(
+          (m) =>
+            `- ${m.name}${m.description ? ` — ${m.description}` : ""} (услуги: ${
+              m.services ? m.services.join(", ") || "нет" : "все"
+            })`
+        )
+        .join("\n")}\nЕсли клиент назвал мастера, передавай его имя в staff_name в инструменты. Если не назвал — не спрашивай специально, запиши к любому свободному; в ответе назови мастера, которого вернул инструмент.\n`
+    : "";
   const closuresContext = closures.length
     ? `\nВыходные и праздничные дни (записи нет):\n${closures
         .map((c) => `- ${c.date}${c.reason ? ` — ${c.reason}` : ""}`)
@@ -91,7 +128,7 @@ ${user?.business_email ? `Email: ${user.business_email}` : ""}
 
 Доступные услуги:
 ${servicesContext}
-${closuresContext}
+${staffContext}${closuresContext}
 ВАЖНЫЕ ПРАВИЛА ПОВЕДЕНИЯ:
 1. Приветствие — ТОЛЬКО в самом первом сообщении диалога. Во всех последующих репликах этой же беседы НИКОГДА не начинай ответ с «Здравствуйте», «Добрый день» или подобных приветствий — сразу отвечай по существу. Это правило важнее любых примеров ниже.
 2. Если клиент хочет записаться на услугу, уточни у него: название услуги, желаемую дату (ГГГГ-ММ-ДД), время (ЧЧ:ММ) и имя. У каждой услуги своя длительность (указана в списке) — запись занимает временной интервал от начала до конца услуги и не должна выходить за рабочие часы и пересекаться с другими записями. Когда все данные собраны — обязательно вызови инструмент create_booking.
@@ -124,6 +161,10 @@ export function makeBookingTool(
           .string()
           .optional()
           .describe("Комментарий клиента к записи"),
+        staff_name: z
+          .string()
+          .optional()
+          .describe("Имя мастера, если клиент выбрал конкретного мастера"),
       })
     ),
     execute: async (input) => {
@@ -144,12 +185,16 @@ export function makeSlotsTool(supabase: SupabaseClient, businessId: string) {
       z.object({
         service_title: z.string().describe("Название услуги из списка"),
         date: z.string().describe("Дата в формате ГГГГ-ММ-ДД"),
+        staff_name: z
+          .string()
+          .optional()
+          .describe("Имя мастера, если клиент хочет к конкретному мастеру"),
       })
     ),
-    execute: async ({ service_title, date }) => {
+    execute: async ({ service_title, date, staff_name }) => {
       const { data: services } = await supabase
         .from("services")
-        .select("title, duration_minutes")
+        .select("id, title, duration_minutes")
         .eq("user_id", businessId)
         .eq("active", true);
       const wanted = service_title.trim().toLowerCase();
@@ -157,6 +202,16 @@ export function makeSlotsTool(supabase: SupabaseClient, businessId: string) {
       if (!service) {
         const list = (services ?? []).map((s) => `«${s.title}»`).join(", ");
         return `ОШИБКА: услуга «${service_title}» не найдена. Доступные услуги: ${list || "нет"}.`;
+      }
+      let staffId: string | null = null;
+      if (staff_name?.trim()) {
+        const qualified = staffForService(await listActiveStaff(supabase, businessId), service.id);
+        const member = findStaffByName(qualified, staff_name);
+        if (!member) {
+          const names = qualified.map((m) => m.name).join(", ");
+          return `ОШИБКА: мастер «${staff_name}» не выполняет эту услугу или не найден. Мастера для этой услуги: ${names || "нет"}.`;
+        }
+        staffId = member.id;
       }
       const { data: business } = await supabase
         .from("users")
@@ -168,6 +223,8 @@ export function makeSlotsTool(supabase: SupabaseClient, businessId: string) {
         date: date.trim(),
         durationMinutes: service.duration_minutes ?? 30,
         workingHours: business?.working_hours as WorkingHours | null,
+        serviceId: service.id,
+        staffId,
       });
       const free = slots.filter((s) => s.available).map((s) => s.time);
       return free.length
@@ -215,12 +272,13 @@ export async function generateAiReply(
 
   const { data: services } = await supabase
     .from("services")
-    .select("title, description, price, duration_minutes")
+    .select("id, title, description, price, duration_minutes")
     .eq("user_id", businessId)
     .eq("active", true);
 
   const closures = await listUpcomingClosures(supabase, businessId);
-  const system = buildSystemPrompt(user, services ?? [], closures);
+  const staff = await loadAiStaff(supabase, businessId, services ?? []);
+  const system = buildSystemPrompt(user, services ?? [], closures, staff);
 
   // Load previous dialog turns (if any) so the model knows this is a
   // continuation and does not re-greet or lose the booking context.

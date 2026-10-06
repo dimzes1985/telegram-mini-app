@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Calendar, Settings, Briefcase, CreditCard } from "lucide-react";
+import { LayoutDashboard, Calendar, Settings, Briefcase, CreditCard, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -17,6 +17,12 @@ const navItems = [
     short: "Услуги",
     href: "/admin/services",
     icon: Briefcase,
+  },
+  {
+    label: "Мастера",
+    short: "Мастера",
+    href: "/admin/staff",
+    icon: Users,
   },
   {
     label: "Бронирования",
@@ -80,7 +86,7 @@ export function Sidebar() {
 
       {/* Mobile bottom navigation */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {navItems.map((item) => {
             const active = isActive(item.href);
             return (

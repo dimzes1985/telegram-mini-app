@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookingCalendar } from "@/components/booking-calendar";
 import { useTimeSlots } from "@/lib/use-time-slots";
+import { useStaffForService } from "@/lib/use-staff";
+import { StaffPicker } from "@/components/staff-picker";
 import { useMessenger } from "@/lib/messenger";
 import { bookingEndTime } from "@/lib/slot";
 import { ArrowLeft, Check } from "lucide-react";
@@ -44,6 +46,10 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  // null = any free staff member
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  // Staff member assigned by the server (shown on the success screen).
+  const [bookedStaffName, setBookedStaffName] = useState<string | null>(null);
   const [workingHours, setWorkingHours] = useState<Record<string, WorkingHoursDay> | null>(null);
   const [closedDates, setClosedDates] = useState<string[]>([]);
   const [customerName, setCustomerName] = useState("");
@@ -101,13 +107,20 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
     businessId,
     serviceId: selectedService?.id,
     date: selectedDate,
+    staffId: selectedStaffId,
   });
+
+  const staffList = useStaffForService(businessId, selectedService?.id);
+  const selectedStaffName =
+    staffList?.find((s) => s.id === selectedStaffId)?.name ?? null;
 
   const isWorkingDay = (date: Date): boolean => {
     if (closedDates.includes(format(date, "yyyy-MM-dd"))) return false;
-    if (!workingHours) return true;
+    const staffHours = staffList?.find((s) => s.id === selectedStaffId)?.working_hours;
+    const schedule = staffHours ?? workingHours;
+    if (!schedule) return true;
     const dayName = DAY_NAMES[date.getDay()];
-    const hours = workingHours[dayName];
+    const hours = schedule[dayName];
     return !!hours && hours.enabled;
   };
 
@@ -131,6 +144,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
         body: JSON.stringify({
           service_id: selectedService.id,
           user_id: businessId,
+          staff_id: selectedStaffId,
           booking_date: format(selectedDate, "yyyy-MM-dd"),
           booking_time: selectedTime,
           customer_name: customerName,
@@ -144,6 +158,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
 
       if (res.ok) {
         webApp.HapticFeedback.notificationOccurred("success");
+        setBookedStaffName(data?.staff?.name ?? null);
         setStep("success");
       } else {
         webApp.HapticFeedback.notificationOccurred("error");
@@ -180,6 +195,8 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
               onClick={() => {
                 webApp.HapticFeedback.impactOccurred("medium");
                 setSelectedService(service);
+                setSelectedStaffId(null);
+                setSelectedTime(null);
                 setStep("datetime");
               }}
             >
@@ -226,6 +243,17 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
         <p className="text-sm text-gray-600 mb-4">
           {selectedService?.title} — {selectedService?.price} ₽
         </p>
+
+        {staffList && (
+          <StaffPicker
+            staff={staffList}
+            selected={selectedStaffId}
+            onSelect={(id) => {
+              setSelectedStaffId(id);
+              setSelectedTime(null);
+            }}
+          />
+        )}
 
         <div className="mb-4">
           <BookingCalendar
@@ -307,6 +335,12 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
                   {selectedEndTime ? `–${selectedEndTime}` : ""}
                 </span>
               </div>
+              {staffList && staffList.length > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Мастер</span>
+                  <span className="font-medium">{selectedStaffName ?? "Любой свободный"}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-gray-600">Цена</span>
                 <span className="font-bold text-blue-600">
@@ -384,6 +418,12 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
                   {selectedEndTime ? `–${selectedEndTime}` : ""}
                 </span>
               </div>
+              {bookedStaffName && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Мастер</span>
+                  <span className="font-medium">{bookedStaffName}</span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -394,6 +434,8 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
             setSelectedService(null);
             setSelectedDate(undefined);
             setSelectedTime(null);
+            setSelectedStaffId(null);
+            setBookedStaffName(null);
             setCustomerName("");
             setCustomerPhone("");
           }}

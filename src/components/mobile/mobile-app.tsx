@@ -22,6 +22,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookingCalendar } from "@/components/booking-calendar";
 import { useTimeSlots } from "@/lib/use-time-slots";
+import { useStaffForService } from "@/lib/use-staff";
+import { StaffPicker } from "@/components/staff-picker";
 import { bookingEndTime } from "@/lib/slot";
 import {
   CUSTOMER_KEY,
@@ -76,6 +78,9 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  // null = any free staff member
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  const [bookedStaffName, setBookedStaffName] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState(
     () => readJson<SavedCustomer>(CUSTOMER_KEY)?.name || ""
   );
@@ -173,12 +178,18 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
     businessId: business?.id,
     serviceId: selectedService?.id,
     date: selectedDate,
+    staffId: selectedStaffId,
   });
+
+  const staffList = useStaffForService(business?.id, selectedService?.id);
+  const selectedStaffName = staffList?.find((s) => s.id === selectedStaffId)?.name ?? null;
 
   const isWorkingDay = (date: Date) => {
     if (business?.closed_dates?.includes(format(date, "yyyy-MM-dd"))) return false;
-    if (!business?.working_hours) return true;
-    const hours = business.working_hours[DAY_NAMES[date.getDay()]];
+    const staffHours = staffList?.find((s) => s.id === selectedStaffId)?.working_hours;
+    const schedule = staffHours ?? business?.working_hours;
+    if (!schedule) return true;
+    const hours = schedule[DAY_NAMES[date.getDay()]];
     return !!hours?.enabled;
   };
 
@@ -197,6 +208,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           service_id: selectedService.id,
+          staff_id: selectedStaffId,
           user_id: business.id,
           booking_date: format(selectedDate, "yyyy-MM-dd"),
           booking_time: selectedTime,
@@ -221,6 +233,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
       if (typeof data.manage_token === "string") {
         addManageToken(business.id, data.manage_token);
       }
+      setBookedStaffName(data?.staff?.name ?? null);
       haptic("success");
       setScreen("success");
     } catch {
@@ -234,6 +247,8 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
     setSelectedService(null);
     setSelectedDate(undefined);
     setSelectedTime(null);
+    setSelectedStaffId(null);
+    setBookedStaffName(null);
     setError(null);
     setScreen("services");
   }
@@ -412,6 +427,8 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
                   onClick={() => {
                     haptic("medium");
                     setSelectedService(service);
+                    setSelectedStaffId(null);
+                    setSelectedTime(null);
                     setScreen("datetime");
                   }}
                   className="w-full rounded-3xl bg-white p-4 text-left shadow-sm"
@@ -442,6 +459,17 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
               {selectedService?.title} — {selectedService?.price} ₽
             </p>
             {error && <p className="mb-3 text-sm text-rose-300">{error}</p>}
+            {staffList && (
+              <StaffPicker
+                tone="dark"
+                staff={staffList}
+                selected={selectedStaffId}
+                onSelect={(id) => {
+                  setSelectedStaffId(id);
+                  setSelectedTime(null);
+                }}
+              />
+            )}
             <div className="mx-auto max-w-md rounded-3xl bg-white p-3 text-slate-900">
               <BookingCalendar
                 selected={selectedDate}
@@ -505,6 +533,12 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
                   {selectedEndTime ? `–${selectedEndTime}` : ""}
                 </span>
               </div>
+              {staffList && staffList.length > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Мастер</span>
+                  <span className="font-medium">{selectedStaffName ?? "Любой свободный"}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
           <div className="space-y-3">
@@ -549,6 +583,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
             {selectedService?.title}
             {selectedDate ? ` · ${format(selectedDate, "d MMM", { locale: ru })}` : ""}
             {selectedTime ? ` · ${selectedTime}` : ""}
+            {bookedStaffName ? ` · ${bookedStaffName}` : ""}
           </p>
           {business?.business_phone && (
             <a

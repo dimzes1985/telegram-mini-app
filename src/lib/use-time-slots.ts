@@ -15,10 +15,14 @@ export function useTimeSlots(params: {
   businessId: string | null | undefined;
   serviceId: string | null | undefined;
   date: Date | undefined;
+  // Chosen staff member; null/undefined = any staff member.
+  staffId?: string | null;
 }) {
   const { businessId, serviceId, date } = params;
+  const staffId = params.staffId ?? "";
   const dateStr = date ? format(date, "yyyy-MM-dd") : null;
-  const key = businessId && serviceId && dateStr ? `${businessId}|${serviceId}|${dateStr}` : null;
+  const key =
+    businessId && serviceId && dateStr ? `${businessId}|${serviceId}|${dateStr}|${staffId}` : null;
   // Slots are stored with the selection they belong to, so stale slots of
   // another day are never shown while the new ones load.
   const [loaded, setLoaded] = useState<{ key: string; slots: TimeSlot[] } | null>(null);
@@ -28,11 +32,13 @@ export function useTimeSlots(params: {
 
   useEffect(() => {
     if (!businessId || !serviceId || !dateStr) return;
-    const requestKey = `${businessId}|${serviceId}|${dateStr}`;
+    const requestKey = `${businessId}|${serviceId}|${dateStr}|${staffId}`;
     const controller = new AbortController();
     const url =
       `/api/timeslots?date=${dateStr}&service_id=${encodeURIComponent(serviceId)}` +
-      `&business_id=${encodeURIComponent(businessId)}&_=${Date.now()}`;
+      `&business_id=${encodeURIComponent(businessId)}` +
+      (staffId ? `&staff_id=${encodeURIComponent(staffId)}` : "") +
+      `&_=${Date.now()}`;
     fetch(url, { signal: controller.signal, cache: "no-store" })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setLoaded({ key: requestKey, slots: Array.isArray(data) ? data : [] }))
@@ -40,7 +46,7 @@ export function useTimeSlots(params: {
         if ((e as Error).name !== "AbortError") setLoaded({ key: requestKey, slots: [] });
       });
     return () => controller.abort();
-  }, [businessId, serviceId, dateStr, version]);
+  }, [businessId, serviceId, dateStr, staffId, version]);
 
   useEffect(() => {
     if (!businessId || !serviceId || !dateStr) return;
