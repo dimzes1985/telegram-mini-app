@@ -1,6 +1,7 @@
 // Rate limiter with two backends:
 // - Upstash Redis REST (shared across serverless instances) when
-//   UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are configured.
+//   UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN (or the Vercel
+//   Marketplace names KV_REST_API_URL / KV_REST_API_TOKEN) are configured.
 // - In-memory fallback for local development and single-instance deployments.
 //
 // The in-memory map is per-instance, so on horizontally-scaled deployments
@@ -25,20 +26,36 @@ export interface RateLimitResult {
   retryAfterMs: number;
 }
 
+// Upstash REST credentials. Accepts both the Upstash names and the names the
+// Vercel Marketplace integration sets (KV_REST_API_URL / KV_REST_API_TOKEN).
+function upstashCredentials(): { url: string; token: string } | null {
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+  return url && token ? { url, token } : null;
+}
+
 export function isUpstashConfigured(): boolean {
-  return Boolean(
-    process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
-  );
+  return upstashCredentials() !== null;
+}
+
+// Health check: true when Redis answers PING.
+export async function pingUpstash(): Promise<boolean> {
+  try {
+    const [result] = await upstashPipeline([["PING"]]);
+    return result === "PONG";
+  } catch {
+    return false;
+  }
 }
 
 async function upstashPipeline(
   commands: Array<Array<string | number>>
 ): Promise<unknown[]> {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) {
+  const credentials = upstashCredentials();
+  if (!credentials) {
     throw new Error("Upstash Redis is not configured");
   }
+  const { url, token } = credentials;
 
   // Multiple commands must go to the /pipeline endpoint; the root endpoint
   // accepts a single command only.

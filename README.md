@@ -53,8 +53,8 @@ cp .env.example .env.local
 | `YOOKASSA_SECRET_KEY` | Секретный ключ ЮKassa (доступ к API) |
 | `YOOKASSA_ALLOW_IP_BYPASS` | `1` только для локальной проверки вебхука ЮKassa |
 | `CRON_SECRET` | Секрет для cron-эндпоинта продления подписок |
-| `UPSTASH_REDIS_REST_URL` | Опциональный Redis для rate limit |
-| `UPSTASH_REDIS_REST_TOKEN` | Токен Upstash Redis |
+| `UPSTASH_REDIS_REST_URL` (или `KV_REST_API_URL`) | Redis для rate limit (Upstash) |
+| `UPSTASH_REDIS_REST_TOKEN` (или `KV_REST_API_TOKEN`) | Токен Upstash Redis |
 | `CONTACT_BUSINESS_ID` | UUID бизнеса, чей MAX-бот принимает форму с лендинга |
 | `CONTACT_MAX_USER_ID` | MAX user id получателя сообщений с лендинга |
 
