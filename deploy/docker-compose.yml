@@ -1,0 +1,39 @@
+# /opt/slot/docker-compose.yml on the server: the Next.js app and a small
+# Redis (with an Upstash-compatible REST API) for rate limiting. Joins the
+# Supabase network so Caddy can reach the app as slot-app:3000.
+services:
+  app:
+    image: slot-app:latest
+    container_name: slot-app
+    restart: unless-stopped
+    env_file:
+      - app.env
+      - secrets.env
+    mem_limit: 768m
+    networks: [supabase]
+    depends_on: [redis-http]
+
+  redis:
+    image: redis:7-alpine
+    container_name: slot-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    mem_limit: 96m
+    networks: [supabase]
+
+  redis-http:
+    image: hiett/serverless-redis-http:latest
+    container_name: slot-redis-http
+    restart: unless-stopped
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: ${SRH_TOKEN}
+      SRH_CONNECTION_STRING: redis://slot-redis:6379
+    mem_limit: 128m
+    networks: [supabase]
+    depends_on: [redis]
+
+networks:
+  supabase:
+    external: true
+    name: supabase_default

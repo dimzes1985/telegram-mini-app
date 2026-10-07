@@ -1,0 +1,39 @@
+# One-off: copies the database from the old Supabase (secret OLD_DB_URL) to
+# the new server. Run manually: Actions -> "Migrate database" -> Run workflow.
+name: Migrate database
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17 >/dev/null
+
+      - name: Dump old database
+        env:
+          OLD_DB_URL: ${{ secrets.OLD_DB_URL }}
+        run: |
+          PGDUMP=/usr/lib/postgresql/17/bin/pg_dump
+          $PGDUMP "$OLD_DB_URL" --schema=public --no-owner --quote-all-identifiers -f public.sql
+          $PGDUMP "$OLD_DB_URL" --data-only --table=auth.users --table=auth.identities --column-inserts -f auth.sql
+          psql "$OLD_DB_URL" -Atc "select version()"
+          wc -c public.sql auth.sql
+          gzip public.sql auth.sql
+
+      - name: Upload to server and restore
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ vars.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+          ssh root@${{ vars.DEPLOY_HOST }} 'mkdir -p /opt/slot/migrate'
+          scp -q public.sql.gz auth.sql.gz root@${{ vars.DEPLOY_HOST }}:/opt/slot/migrate/
+          ssh root@${{ vars.DEPLOY_HOST }} 'bash /opt/slot/restore-db.sh'
