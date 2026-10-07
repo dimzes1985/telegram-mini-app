@@ -7,7 +7,7 @@ export const LEGAL = {
   operatorInn: process.env.NEXT_PUBLIC_LEGAL_OPERATOR_INN || "683001099891",
   // Address for personal data requests and consent withdrawal.
   contactEmail: process.env.NEXT_PUBLIC_LEGAL_EMAIL || "diman-68@mail.ru",
-  siteUrl: "https://telegram-mini-app-uvr.vercel.app",
+  siteUrl: "https://slot-zapis.ru",
   // Date of the current edition of the documents.
   updatedAt: "06.10.2026",
 };
