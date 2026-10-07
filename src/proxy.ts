@@ -1,7 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+// The app moved from Vercel to the Russian server: old *.vercel.app links
+// (bots, QR codes, bookmarks) are redirected to the new domain.
+const NEW_ORIGIN = "https://slot-zapis.ru";
+
 export async function proxy(request: NextRequest) {
+  const host = request.headers.get("host") ?? "";
+  if (host.endsWith(".vercel.app")) {
+    const { pathname, search } = request.nextUrl;
+    return NextResponse.redirect(new URL(pathname + search, NEW_ORIGIN), 308);
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
