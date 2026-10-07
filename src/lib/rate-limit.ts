@@ -61,7 +61,7 @@ async function upstashPipeline(
   // accepts a single command only.
   const response = await fetch(`${url.replace(/\/+$/, "")}/pipeline`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(commands),
     signal: AbortSignal.timeout(3000),
   });
