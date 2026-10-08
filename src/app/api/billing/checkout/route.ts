@@ -9,6 +9,8 @@ import {
   validationErrorResponse,
 } from "@/lib/http";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { effectivePlanPrice } from "@/lib/promo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,6 +67,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
 
+  // Promo price (e.g. founders' 990 ₽) if the user redeemed one.
+  const amount = await effectivePlanPrice(createAdminClient(), user.id, plan as Plan);
+
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").trim();
   const returnUrl = `${baseUrl}/admin/billing?status=checkout`;
 
@@ -79,7 +84,7 @@ export async function POST(req: Request) {
       // Try to create a subscription payment with the payment method saved for
       // future recurring charges (requires autopayments enabled in YooKassa).
       payment = await createYookassaPayment({
-        amount: planConfig.priceMonthlyRub,
+        amount,
         description: `Подписка ${planConfig.name} (${user.email || "business"})`,
         returnUrl,
         savePaymentMethod: true,
@@ -87,6 +92,7 @@ export async function POST(req: Request) {
           user_id: user.id,
           plan,
           type: "subscription_first",
+          amount: String(amount),
         },
       });
     } catch (e) {
@@ -94,7 +100,7 @@ export async function POST(req: Request) {
       // one-time payment so the first purchase still works.
       if (isRecurringNotAllowed(e)) {
         payment = await createYookassaPayment({
-          amount: planConfig.priceMonthlyRub,
+          amount,
           description: `Подписка ${planConfig.name} (${user.email || "business"})`,
           returnUrl,
           savePaymentMethod: false,

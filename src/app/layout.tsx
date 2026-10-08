@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Unbounded, Manrope } from "next/font/google";
 import "./globals.css";
+import { YandexMetrika } from "@/components/yandex-metrika";
 
 const unbounded = Unbounded({
   variable: "--font-display",
@@ -33,7 +34,10 @@ export default function RootLayout({
       lang="ru"
       className={`${unbounded.variable} ${manrope.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <YandexMetrika />
+      </body>
     </html>
   );
 }

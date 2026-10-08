@@ -5,6 +5,7 @@ import { createYookassaPayment, isYookassaConfigured } from "@/lib/yookassa";
 import { loadOwnerNotifyTargets, notifyOwner } from "@/lib/notify-owner";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { isCronRequestAuthorized } from "@/lib/cron-auth";
+import { effectivePlanPrice } from "@/lib/promo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
   const { data: subs, error } = await admin
     .from("subscriptions")
     .select("*")
-    .in("status", ["active", "past_due"])
+    .in("status", ["active", "trialing", "past_due"])
     .lte("current_period_end", now);
 
   if (error) {
@@ -90,12 +91,11 @@ export async function POST(req: Request) {
     }
 
     const plan = sub.plan as Plan;
-    const price = PLANS[plan]?.priceMonthlyRub;
-
-    if (!price) {
+    if (!PLANS[plan]) {
       results.push({ user_id: sub.user_id, status: "skipped", detail: "unknown plan" });
       continue;
     }
+    const price = await effectivePlanPrice(admin, sub.user_id, plan);
 
     try {
       await createYookassaPayment({
@@ -108,6 +108,7 @@ export async function POST(req: Request) {
           user_id: sub.user_id,
           plan,
           type: "subscription_renewal",
+          amount: String(price),
         },
       });
       results.push({ user_id: sub.user_id, status: "renewal_initiated" });

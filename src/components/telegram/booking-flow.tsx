@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { reachGoal } from "@/lib/metrika";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -171,6 +172,7 @@ export function BookingFlow({ businessId, initialServiceId }: BookingFlowProps) 
         setBookedStaffName(data?.staff?.name ?? null);
         forget();
         setStep("success");
+        reachGoal("booking_created");
       } else {
         webApp.HapticFeedback.notificationOccurred("error");
         setError(data.error || "Что-то пошло не так. Попробуйте ещё раз.");

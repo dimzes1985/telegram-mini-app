@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, CreditCard, Loader2 } from "lucide-react";
+import { Check, CreditCard, Loader2, Ticket } from "lucide-react";
+import { reachGoal } from "@/lib/metrika";
 import { pluralize } from "@/lib/labels";
 
 interface PlanInfo {
@@ -33,6 +34,7 @@ interface BillingStatus {
   } | null;
   usage: { plan: string; used: number; limit: number; remaining: number } | null;
   available_plans: PlanInfo[];
+  promo_prices?: Record<string, number>;
 }
 
 const FREE_PLAN: PlanInfo = {
@@ -74,6 +76,9 @@ function BillingContent() {
   const [confirmUnbind, setConfirmUnbind] = useState(false);
   const [downgrading, setDowngrading] = useState(false);
   const [downgradeNote, setDowngradeNote] = useState("");
+  const [promoCode, setPromoCode] = useState("");
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [promoResult, setPromoResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     if (searchParams.get("status") === "checkout") {
@@ -101,12 +106,41 @@ function BillingContent() {
         return;
       }
       if (data.confirmation_url) {
+        reachGoal("checkout_start", { plan });
         window.location.assign(data.confirmation_url);
       }
     } catch {
       setError("Ошибка соединения");
     } finally {
       setCheckingOut(null);
+    }
+  };
+
+  const handlePromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promoCode.trim()) return;
+    setPromoBusy(true);
+    setPromoResult(null);
+    try {
+      const res = await fetch("/api/billing/promo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: promoCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPromoResult({ ok: false, text: data.error || "Не удалось применить промокод" });
+        return;
+      }
+      setPromoResult({ ok: true, text: data.message });
+      setPromoCode("");
+      reachGoal("promo_applied");
+      const statusRes = await fetch("/api/billing/status");
+      if (statusRes.ok) setStatus(await statusRes.json());
+    } catch {
+      setPromoResult({ ok: false, text: "Ошибка соединения" });
+    } finally {
+      setPromoBusy(false);
     }
   };
 
@@ -172,6 +206,8 @@ function BillingContent() {
   const subscription = status?.subscription ?? null;
   const subscriptionActive =
     subscription?.status === "active" || subscription?.status === "trialing";
+  const isTrial = subscription?.status === "trialing";
+  const promoPrices = status?.promo_prices ?? {};
 
   return (
     <div>
@@ -190,7 +226,9 @@ function BillingContent() {
               </Badge>
             </CardTitle>
             <CardDescription>
-              {subscription.cancel_at_period_end
+              {isTrial
+                ? "Бесплатный период по промокоду. Чтобы тариф не отключился, оплатите его — оплаченный месяц начнётся после окончания бесплатного."
+                : subscription.cancel_at_period_end
                 ? "Подписка будет отменена в конце текущего периода."
                 : "Автоматически продлевается каждый месяц."}
             </CardDescription>
@@ -322,6 +360,34 @@ function BillingContent() {
         </Card>
       )}
 
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <form onSubmit={handlePromo} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label htmlFor="promo" className="flex items-center gap-2 text-sm font-medium sm:mr-2">
+              <Ticket className="h-4 w-4 text-blue-600" />
+              Есть промокод?
+            </label>
+            <input
+              id="promo"
+              value={promoCode}
+              onChange={(e) => setPromoCode(e.target.value)}
+              placeholder="Например, START30"
+              maxLength={40}
+              autoComplete="off"
+              className="h-10 flex-1 rounded-md border px-3 text-sm uppercase outline-none focus:ring-2 focus:ring-blue-200"
+            />
+            <Button type="submit" variant="outline" disabled={promoBusy || !promoCode.trim()}>
+              {promoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Применить"}
+            </Button>
+          </form>
+          {promoResult && (
+            <p className={`mt-2 text-sm ${promoResult.ok ? "text-green-600" : "text-red-500"}`}>
+              {promoResult.text}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       <label className="mb-4 flex cursor-pointer items-start gap-2 rounded-lg border bg-white p-3 text-sm leading-snug text-gray-600">
         <input
           type="checkbox"
@@ -343,12 +409,22 @@ function BillingContent() {
         {plans.map((plan) => {
           const isCurrent = plan.id === currentPlan;
           const isPaid = plan.id !== "free";
+          const promoPrice = promoPrices[plan.id];
+          // During a free trial the current plan can (and should) be paid for.
+          const canPayCurrent = isCurrent && isPaid && isTrial;
           return (
             <Card key={plan.id} className={isCurrent ? "border-blue-500 ring-2 ring-blue-200" : ""}>
               <CardHeader>
                 <CardTitle className="capitalize">{plan.name}</CardTitle>
                 <div className="text-3xl font-bold">
-                  {plan.price_monthly_rub === 0 ? "Бесплатно" : `${plan.price_monthly_rub.toLocaleString("ru-RU")} ₽`}
+                  {promoPrice ? (
+                    <>
+                      <span className="mr-2 text-lg font-normal text-gray-400 line-through">
+                        {plan.price_monthly_rub.toLocaleString("ru-RU")} ₽
+                      </span>
+                      {promoPrice.toLocaleString("ru-RU")} ₽
+                    </>
+                  ) : plan.price_monthly_rub === 0 ? "Бесплатно" : `${plan.price_monthly_rub.toLocaleString("ru-RU")} ₽`}
                   {plan.price_monthly_rub !== 0 && (
                     <span className="text-base font-normal text-gray-500">/мес</span>
                   )}
@@ -377,7 +453,10 @@ function BillingContent() {
                     </li>
                   )}
                 </ul>
-                {isCurrent ? (
+                {promoPrice && (
+                  <Badge variant="secondary">Ваша цена по промокоду</Badge>
+                )}
+                {isCurrent && !canPayCurrent ? (
                   <Button variant="outline" disabled className="w-full">
                     Текущий тариф
                   </Button>
@@ -392,6 +471,8 @@ function BillingContent() {
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         Перенаправление...
                       </>
+                    ) : canPayCurrent ? (
+                      "Оплатить"
                     ) : (
                       "Улучшить"
                     )}

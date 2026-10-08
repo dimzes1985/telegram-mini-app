@@ -24,6 +24,7 @@ jobs:
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
             --build-arg NEXT_PUBLIC_APP_URL="${{ vars.NEXT_PUBLIC_APP_URL }}" \
             --build-arg NEXT_PUBLIC_SENTRY_DSN="${{ vars.NEXT_PUBLIC_SENTRY_DSN }}" \
+            --build-arg NEXT_PUBLIC_YM_ID="${{ vars.NEXT_PUBLIC_YM_ID }}" \
             -t slot-app:latest .
           docker save slot-app:latest | gzip > slot-app.tar.gz
 

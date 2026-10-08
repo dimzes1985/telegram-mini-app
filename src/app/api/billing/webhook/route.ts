@@ -6,6 +6,7 @@ import {
   isYookassaConfigured,
   isYookassaWebhookIp,
 } from "@/lib/yookassa";
+import { firstPeriodStart } from "@/lib/promo";
 import { loadOwnerNotifyTargets, notifyOwner } from "@/lib/notify-owner";
 
 export const runtime = "nodejs";
@@ -103,10 +104,15 @@ export async function POST(req: Request) {
   // For successful payments also make sure the full plan price was paid in
   // RUB (the amount is taken from the ЮKassa API, not from the request body).
   const paidAmount = Number(payment.amount?.value ?? NaN);
+  // Promo prices are stored in the payment metadata by our server (the
+  // metadata comes from the ЮKassa API, so it cannot be forged by the caller).
+  const metaAmount = Number(paymentMetadata.amount);
+  const expectedAmount =
+    Number.isFinite(metaAmount) && metaAmount > 0 ? metaAmount : PLANS[plan].priceMonthlyRub;
   const amountOk =
     expectedStatus !== "succeeded" ||
     (payment.amount?.currency === "RUB" &&
-      Math.abs(paidAmount - PLANS[plan].priceMonthlyRub) < 0.01);
+      Math.abs(paidAmount - expectedAmount) < 0.01);
   const verified =
     payment.status === expectedStatus &&
     paymentMetadata.type === metadata.type &&
@@ -148,10 +154,10 @@ export async function POST(req: Request) {
     const { data: existingSub } = await admin
       .from("subscriptions")
       .select(
-        "id, current_period_end, yookassa_payment_method_id, yookassa_payment_id"
+        "id, status, current_period_end, yookassa_payment_method_id, yookassa_payment_id"
       )
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
     // If this payment did not save a payment method (e.g. the one-time
     // fallback path), keep the method previously saved on the subscription so
@@ -173,7 +179,7 @@ export async function POST(req: Request) {
       const periodStart =
         metadata.type === "subscription_renewal" && existingSub?.current_period_end
           ? new Date(existingSub.current_period_end)
-          : now;
+          : firstPeriodStart(existingSub, now);
       const periodEnd = new Date(periodStart);
       periodEnd.setMonth(periodEnd.getMonth() + 1);
 

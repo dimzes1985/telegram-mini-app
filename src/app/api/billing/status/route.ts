@@ -86,10 +86,28 @@ export async function GET() {
     usage = null;
   }
 
+  // Special prices from redeemed promo codes, e.g. { pro: 990 }.
+  const promoPrices: Record<string, number> = {};
+  try {
+    const { data: promos } = await admin
+      .from("promo_redemptions")
+      .select("plan, price_rub, created_at")
+      .eq("user_id", user.id)
+      .eq("kind", "price")
+      .order("created_at", { ascending: true });
+    for (const p of promos || []) {
+      const price = Number(p.price_rub);
+      if (price > 0) promoPrices[p.plan] = price;
+    }
+  } catch {
+    // promo tables may not exist yet
+  }
+
   return NextResponse.json({
     current_plan: currentPlan,
     subscription,
     usage,
     available_plans: availablePlans,
+    promo_prices: promoPrices,
   });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { reachGoal } from "@/lib/metrika";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ export default function LoginPage() {
         setError(data.message || "Проверьте почту для подтверждения.");
         return;
       }
+      if (payload.action === "signup") reachGoal("signup");
       router.push("/admin");
       router.refresh();
     } catch {
