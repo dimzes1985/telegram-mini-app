@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { reachGoal } from "@/lib/metrika";
 import { format } from "date-fns";
 import { MyBookings } from "@/components/customer/my-bookings";
 import { ru } from "date-fns/locale";
@@ -246,6 +247,7 @@ export function MobileApp({ initialBusinessId }: { initialBusinessId?: string | 
       setBookedStaffName(data?.staff?.name ?? null);
       forget();
       haptic("success");
+      reachGoal("booking_created");
       setScreen("success");
     } catch {
       setError("Ошибка соединения");
