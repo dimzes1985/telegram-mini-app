@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { sendPushToOwner } from "@/lib/push";
 import { notifyOwner, type OwnerNotifyTargets } from "@/lib/notify-owner";
 import { bookingEndTime, findOverlappingSlot, toBookedSlots } from "@/lib/slot";
 import { checkSlotRules, SLOT_RULE_MESSAGES, type WorkingHours } from "@/lib/booking-rules";
@@ -267,7 +268,16 @@ export async function placeBooking(input: PlaceBookingInput): Promise<PlaceBooki
   lines.push(`📲 Источник: ${sourceLabel}`);
 
   // Awaited so serverless does not drop it; notifyOwner never rejects.
-  await notifyOwner(business, lines.join("\n"));
+  await Promise.all([
+    notifyOwner(business, lines.join("\n")),
+    sendPushToOwner(businessId, {
+      title: "🔔 Новая запись",
+      body: `${service.title} · ${formatRuDate(date)} ${time}\n${input.customerName}${
+        input.customerPhone ? `, ${input.customerPhone}` : ""
+      }`,
+      url: "/admin/bookings",
+    }),
+  ]);
 
   return {
     ok: true,

@@ -1,0 +1,23 @@
+{
+  "name": "Slot Админ — записи клиентов",
+  "short_name": "Slot Админ",
+  "description": "Записи, расписание и уведомления о новых клиентах",
+  "id": "/admin",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F9FAFB",
+  "theme_color": "#111827",
+  "lang": "ru",
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    { "name": "Записи", "url": "/admin/bookings", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Услуги", "url": "/admin/services", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

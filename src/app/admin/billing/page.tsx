@@ -361,7 +361,7 @@ function BillingContent() {
       )}
 
       <Card className="mb-6">
-        <CardContent className="pt-6">
+        <CardContent>
           <form onSubmit={handlePromo} className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <label htmlFor="promo" className="flex items-center gap-2 text-sm font-medium sm:mr-2">
               <Ticket className="h-4 w-4 text-blue-600" />
