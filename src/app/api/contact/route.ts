@@ -1,41 +1,43 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { sendMaxMessage } from "@/lib/max-bot";
-import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 import { z } from "zod";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { rateLimit, pruneRateLimitBuckets } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/client-ip";
-import {
-  parseJsonBody,
-  invalidJsonResponse,
-  validationErrorResponse,
-} from "@/lib/http";
+import { parseJsonBody, invalidJsonResponse, validationErrorResponse } from "@/lib/http";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { addDemoContact } from "@/lib/demo-store";
+import { saveAndNotifyLead } from "@/lib/leads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const contactSchema = z.object({
-  name: z.string().trim().min(1, "Имя обязательно").max(200),
-  contact: z.string().trim().max(500).optional(),
-  message: z.string().trim().min(1, "Сообщение обязательно").max(2000),
-});
+const contactSchema = z
+  .object({
+    kind: z.enum(["question", "setup", "chat"]).default("question"),
+    name: z.string().trim().min(1, "Укажите имя").max(200),
+    contact: z.string().trim().max(200).optional(),
+    niche: z.string().trim().max(100).optional(),
+    message: z.string().trim().max(2000).optional(),
+    // "I agree to the processing of personal data" checkbox.
+    consent: z.literal(true, { error: "Нужно согласие на обработку персональных данных" }),
+    // Honeypot: real people never fill this hidden field.
+    website: z.string().max(0).optional(),
+  })
+  .refine((d) => d.kind === "setup" || Boolean(d.message), {
+    message: "Напишите ваш вопрос",
+    path: ["message"],
+  })
+  .refine((d) => d.kind === "question" || Boolean(d.contact), {
+    message: "Укажите телефон или Telegram, чтобы мы могли ответить",
+    path: ["contact"],
+  });
 
-// Where contact-form messages are delivered.
-// The owner's own MAX bot (configured in the admin panel) is used as the
-// delivery channel; the recipient is the owner's MAX user id.
-const OWNER_BUSINESS_ID =
-  process.env.CONTACT_BUSINESS_ID ||
-  "0173527d-6470-4d93-b7a2-9b9b51c032f5";
-const OWNER_MAX_USER_ID = Number(process.env.CONTACT_MAX_USER_ID || 30876538);
-
-// POST /api/contact - forward a landing page feedback form to the owner via MAX
+// POST /api/contact - a question or a "set it up for me" request from the
+// landing page; delivered to the Slot owner (Telegram/MAX, push, e-mail).
 export async function POST(req: Request) {
   pruneRateLimitBuckets();
 
-  const ip = getClientIp(req);
-
-  const { allowed, retryAfterMs } = await rateLimit(`contact:${ip}`, {
+  const { allowed, retryAfterMs } = await rateLimit(`contact:${getClientIp(req)}`, {
     windowMs: 60 * 60 * 1000,
     max: 5,
   });
@@ -50,48 +52,16 @@ export async function POST(req: Request) {
   if (body === undefined) return invalidJsonResponse();
   const parsed = contactSchema.safeParse(body);
   if (!parsed.success) return validationErrorResponse(parsed.error);
-
-  const { name, contact, message } = parsed.data;
+  const { kind, name, contact, niche, message } = parsed.data;
 
   if (!isSupabaseConfigured()) {
-    addDemoContact({ name, contact, message });
+    addDemoContact({ name, contact, message: message || `[${kind}] ${niche || ""}` });
     return NextResponse.json({ ok: true, demo: true });
   }
 
-  const admin = createAdminClient();
-  const { data: owner, error } = await admin
-    .from("users")
-    .select("max_bot_token")
-    .eq("id", OWNER_BUSINESS_ID)
-    .not("max_bot_token", "is", null)
-    .maybeSingle();
-
-  if (error || !owner?.max_bot_token) {
-    return NextResponse.json(
-      { error: "Обратная связь временно недоступна" },
-      { status: 503 }
-    );
+  const ok = await saveAndNotifyLead(createAdminClient(), { kind, name, contact, niche, message });
+  if (!ok) {
+    return NextResponse.json({ error: "Не удалось отправить. Напишите нам в Telegram." }, { status: 502 });
   }
-
-  const text = [
-    "Новое сообщение с сайта",
-    `Имя: ${name}`,
-    contact ? `Контакт: ${contact}` : null,
-    "---",
-    message,
-  ]
-    .filter((line) => line !== null)
-    .join("\n");
-
-  try {
-    await sendMaxMessage(owner.max_bot_token, OWNER_MAX_USER_ID, text);
-  } catch (e) {
-    console.error("Contact delivery failed:", e);
-    return NextResponse.json(
-      { error: "Не удалось отправить сообщение" },
-      { status: 502 }
-    );
-  }
-
   return NextResponse.json({ ok: true });
 }

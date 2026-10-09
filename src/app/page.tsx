@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { SupportWidget, openSupport } from "@/components/support-widget";
+import { reachGoal } from "@/lib/metrika";
 import { Badge } from "@/components/ui/badge";
 import {
   Bot,
@@ -29,7 +31,6 @@ const PLANS = [
     id: "free",
     name: "Free",
     price: 0,
-    priceYearly: 0,
     tagline: "Попробуйте всё сами",
     features: [
       "3 услуги",
@@ -45,7 +46,6 @@ const PLANS = [
     id: "pro",
     name: "Pro",
     price: 1490,
-    priceYearly: 1190,
     tagline: "Для растущего бизнеса",
     features: [
       "До 20 услуг",
@@ -61,7 +61,6 @@ const PLANS = [
     id: "business",
     name: "Business",
     price: 4990,
-    priceYearly: 3990,
     tagline: "Для сетей и больших команд",
     features: [
       "Безлимит услуг",
@@ -90,7 +89,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Что умеет ИИ-ассистент?",
-    a: "ИИ отвечает на вопросы клиентов 24/7: подбирает услуги, рассказывает о ценах и часах работы, помогает записаться. Работает на базе GPT-4o и отвечает мгновенно.",
+    a: "ИИ отвечает на вопросы клиентов 24/7: подбирает услуги, рассказывает о ценах и часах работы, помогает записаться. Отвечает мгновенно, а если вопрос сложный — подсказывает связаться с вами.",
   },
   {
     q: "Можно ли отменить подписку?",
@@ -102,26 +101,6 @@ const FAQ_ITEMS = [
   },
 ];
 
-const TESTIMONIALS = [
-  {
-    name: "Анна",
-    role: "Салон красоты, Москва",
-    text: "Клиенты записываются прямо из Telegram, даже ночью. ИИ отвечает на вопросы, пока я занята руками. За первый месяц записей стало на 40% больше.",
-    stars: 5,
-  },
-  {
-    name: "Дмитрий",
-    role: "Автомастерская, Казань",
-    text: "Раньше половина звонков оставалась без ответа. Теперь клиент сам видит свободные окна и записывается. Освободил два часа в день на работу.",
-    stars: 5,
-  },
-  {
-    name: "Марина",
-    role: "Студия маникюра, СПб",
-    text: "Подключили за один вечер. ИИ сам подбирает клиентам покрытие и записывает. Это как второй администратор, который работает без выходных.",
-    stars: 5,
-  },
-];
 
 const USE_CASES = [
   {
@@ -201,9 +180,8 @@ function Reveal({
 }
 
 export default function Home() {
-  const [yearly, setYearly] = useState(true);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-  const [contact, setContact] = useState({ name: "", contact: "", message: "" });
+  const [contact, setContact] = useState({ name: "", contact: "", message: "", consent: false, website: "" });
   const [contactStatus, setContactStatus] = useState<
     "idle" | "sending" | "sent" | "error"
   >("idle");
@@ -217,7 +195,7 @@ export default function Home() {
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(contact),
+        body: JSON.stringify({ ...contact, kind: "question" }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -226,7 +204,8 @@ export default function Home() {
         return;
       }
       setContactStatus("sent");
-      setContact({ name: "", contact: "", message: "" });
+      setContact({ name: "", contact: "", message: "", consent: false, website: "" });
+      reachGoal("lead_sent", { kind: "question" });
     } catch {
       setContactStatus("error");
       setContactError("Ошибка соединения");
@@ -234,7 +213,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen overflow-x-clip bg-white">
       {/* ============ NAVBAR ============ */}
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
@@ -288,7 +267,7 @@ export default function Home() {
             </span>
           </h1>
           <p className="hero-in-delay-2 mx-auto mt-6 max-w-2xl text-lg text-gray-600">
-            Готовая система бронирования + ИИ-менеджер на базе GPT-4o. Клиенты
+            Готовая система бронирования + ИИ-менеджер. Клиенты
             видят услуги, выбирают свободное время и записываются — прямо в вашем
             боте. Работает 24/7, вы платите только когда растёте.
           </p>
@@ -297,12 +276,15 @@ export default function Home() {
               Начать бесплатно
               <ArrowRight className="ml-1" />
             </Button>
-            <Button size="lg" variant="outline" className="h-12 px-8 text-base" render={<Link href="/mobile" />}>
-              Открыть приложение
+            <Button size="lg" variant="outline" className="h-12 px-8 text-base" onClick={() => openSupport("setup")}>
+              Настроим за вас бесплатно
             </Button>
           </div>
           <p className="hero-in-delay-3 mt-4 text-sm text-gray-500">
-            Бесплатный план — без карты и обязательств
+            Бесплатный план — без карты и обязательств ·{" "}
+            <Link href="/mobile" className="text-blue-600 hover:underline">
+              Посмотреть, как это видит клиент
+            </Link>
           </p>
 
           {/* Stats */}
@@ -365,7 +347,7 @@ export default function Home() {
             {
               icon: <Bot className="h-6 w-6" />,
               title: "ИИ-ассистент 24/7",
-              desc: "GPT-4o отвечает клиентам, подбирает услуги и помогает записаться в любое время. Вы занимаетесь делом, а не чатами.",
+              desc: "ИИ-ассистент отвечает клиентам, подбирает услуги и помогает записаться в любое время. Вы занимаетесь делом, а не чатами.",
               color: "bg-blue-50 text-blue-600",
             },
             {
@@ -547,33 +529,11 @@ export default function Home() {
               больше записей.
             </p>
 
-            {/* Billing toggle */}
-            <div className="mt-8 inline-flex items-center gap-3 rounded-full border border-gray-200 bg-white p-1.5 shadow-sm">
-              <button
-                onClick={() => setYearly(false)}
-                className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${
-                  !yearly ? "bg-blue-600 text-white" : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                Помесячно
-              </button>
-              <button
-                onClick={() => setYearly(true)}
-                className={`flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-colors ${
-                  yearly ? "bg-blue-600 text-white" : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                На год
-                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${yearly ? "bg-white/20" : "bg-green-100 text-green-700"}`}>
-                  −20%
-                </span>
-              </button>
-            </div>
           </Reveal>
 
           <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-3">
             {PLANS.map((plan, idx) => {
-              const price = yearly ? plan.priceYearly : plan.price;
+              const price = plan.price;
               return (
                 <div
                   key={plan.id}
@@ -594,11 +554,6 @@ export default function Home() {
                     <span className="text-4xl font-bold text-gray-900">{price} ₽</span>
                     <span className="text-sm text-gray-500">/мес</span>
                   </div>
-                  {yearly && plan.priceYearly < plan.price && (
-                    <p className="mt-1 text-xs text-green-600">
-                      При годовой оплате — экономия {(plan.price - plan.priceYearly) * 12} ₽ в год
-                    </p>
-                  )}
                   <ul className="mt-6 flex-1 space-y-3">
                     {plan.features.map((f) => (
                       <li key={f} className="flex items-start gap-2 text-sm text-gray-700">
@@ -623,39 +578,11 @@ export default function Home() {
           <p className="mt-8 text-center text-sm text-gray-500">
             Оплата помесячная. Отмена в один клик, без скрытых условий.
           </p>
-        </div>
-      </section>
-
-      {/* ============ TESTIMONIALS ============ */}
-      <section className="mx-auto max-w-6xl px-4 py-20">
-        <Reveal className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900 md:text-4xl">
-            Что говорят клиенты
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-gray-600">
-            Реальные истории бизнесов, которые перешли на запись через Telegram.
-          </p>
-        </Reveal>
-        <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
-          {TESTIMONIALS.map((t, idx) => (
-            <Reveal key={t.name} delay={idx * 120} className="card-hover flex flex-col rounded-2xl border border-gray-100 bg-gray-50/50 p-6 shadow-sm">
-              <div className="mb-3 flex gap-0.5">
-                {Array.from({ length: t.stars }).map((_, i) => (
-                  <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                ))}
-              </div>
-              <p className="flex-1 text-sm text-gray-700">«{t.text}»</p>
-              <div className="mt-4 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-sm font-semibold text-white">
-                  {t.name[0]}
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-gray-900">{t.name}</div>
-                  <div className="text-xs text-gray-500">{t.role}</div>
-                </div>
-              </div>
-            </Reveal>
-          ))}
+          <div className="mt-6 text-center">
+            <Button variant="outline" onClick={() => openSupport("setup")}>
+              Не хотите разбираться? Настроим за вас бесплатно
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -701,8 +628,11 @@ export default function Home() {
             Связаться с нами
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-gray-600">
-            Остались вопросы или хотите обсудить подключение? Напишите нам — мы
-            ответим в мессенджере в течение рабочего дня.
+            Остались вопросы или хотите обсудить подключение? Напишите — ответим
+            в течение рабочего дня. Или сразу в Telegram:{" "}
+            <a href="https://t.me/DmitrKuleshov" target="_blank" rel="noopener" className="text-blue-600 hover:underline">
+              @DmitrKuleshov
+            </a>
           </p>
         </Reveal>
         <Reveal delay={120}>
@@ -744,6 +674,29 @@ export default function Home() {
                   placeholder="Ваш вопрос или сообщение"
                   className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 />
+                <input
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  value={contact.website}
+                  onChange={(e) => setContact({ ...contact, website: e.target.value })}
+                  className="absolute -left-[9999px] h-0 w-0 opacity-0"
+                />
+                <label className="flex items-start gap-2 text-sm leading-snug text-gray-600">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={contact.consent}
+                    onChange={(e) => setContact({ ...contact, consent: e.target.checked })}
+                    className="mt-0.5 size-4 shrink-0 accent-blue-600"
+                  />
+                  <span>
+                    Согласен на обработку персональных данных по{" "}
+                    <Link href="/privacy" target="_blank" className="text-blue-600 underline">
+                      политике конфиденциальности
+                    </Link>
+                  </span>
+                </label>
                 {contactStatus === "error" && contactError && (
                   <p className="text-sm text-red-600">{contactError}</p>
                 )}
@@ -817,6 +770,7 @@ export default function Home() {
           </nav>
         </div>
       </footer>
+      <SupportWidget />
     </div>
   );
 }
