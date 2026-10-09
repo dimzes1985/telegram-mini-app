@@ -9,6 +9,7 @@ import { bookingStatusLabel } from "@/lib/labels";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getDemoState } from "@/lib/demo-store";
 import { AppLinksCard } from "@/components/admin/app-links-card";
+import { AdminAppCard } from "@/components/admin/admin-app-card";
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
@@ -60,6 +61,7 @@ export default async function AdminDashboard() {
         </p>
       )}
 
+      <AdminAppCard />
       <AppLinksCard />
 
       {/* Stats Cards */}

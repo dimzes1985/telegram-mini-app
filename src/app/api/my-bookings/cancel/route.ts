@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sendPushToOwner } from "@/lib/push";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseJsonBody, invalidJsonResponse, validationErrorResponse } from "@/lib/http";
@@ -54,6 +55,11 @@ export async function POST(req: Request) {
   }
 
   const b = result.booking;
+  await sendPushToOwner(parsed.data.business_id, {
+    title: "❌ Клиент отменил запись",
+    body: `${b.service_title} · ${formatRuDate(b.booking_date)} ${b.booking_time}\n${result.customerName}`,
+    url: "/admin/bookings",
+  });
   await notifyOwner(
     resolved.business,
     [
