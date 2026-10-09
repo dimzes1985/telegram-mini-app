@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { reachGoal } from "@/lib/metrika";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,7 +95,14 @@ export default function LoginPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="password">Пароль</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Пароль</Label>
+                    {!demoMode && (
+                      <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
+                        Забыли пароль?
+                      </Link>
+                    )}
+                  </div>
                   <Input
                     id="password"
                     type="password"
