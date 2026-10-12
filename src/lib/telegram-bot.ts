@@ -1,4 +1,36 @@
-const TELEGRAM_API = "https://api.telegram.org";
+// Can point to a relay/proxy if api.telegram.org becomes unreachable.
+const TELEGRAM_API = (process.env.TELEGRAM_API_URL || "https://api.telegram.org").replace(/\/+$/, "");
+
+const ATTEMPT_TIMEOUT_MS = 10_000;
+const MAX_ATTEMPTS = 3;
+
+// fetch to the Telegram Bot API with a per-attempt timeout and retries on
+// network errors. From servers in Russia a noticeable share of connections to
+// api.telegram.org hangs or resets ("fetch failed"); a quick retry almost
+// always succeeds. HTTP error responses are returned as-is (not retried).
+export async function tgFetch(url: string, init?: RequestInit): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await fetch(url, { ...init, signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS) });
+    } catch (e) {
+      lastError = e;
+      if (attempt < MAX_ATTEMPTS) await new Promise((r) => setTimeout(r, 400 * attempt));
+    }
+  }
+  throw new TelegramNetworkError(lastError);
+}
+
+export function telegramApiUrl(botToken: string, method: string): string {
+  return `${TELEGRAM_API}/bot${botToken}/${method}`;
+}
+
+export class TelegramNetworkError extends Error {
+  constructor(cause: unknown) {
+    super("Нет связи с серверами Telegram. Попробуйте ещё раз через минуту.", { cause });
+    this.name = "TelegramNetworkError";
+  }
+}
 
 export interface TelegramMessage {
   message_id: number;
@@ -44,7 +76,7 @@ export async function sendTelegramMessage(
   }
 ) {
   const url = `${TELEGRAM_API}/bot${botToken}/sendMessage`;
-  const response = await fetch(url, {
+  const response = await tgFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({
@@ -139,7 +171,7 @@ export async function answerCallbackQuery(
   text?: string
 ) {
   const url = `${TELEGRAM_API}/bot${botToken}/answerCallbackQuery`;
-  const response = await fetch(url, {
+  const response = await tgFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({
@@ -166,7 +198,7 @@ export async function sendTelegramMessageChunked(
   for (let i = 0; i < text.length; i += MAX_CHARS) {
     const chunk = text.slice(i, i + MAX_CHARS);
     const isLast = i + MAX_CHARS >= text.length;
-    const response = await fetch(url, {
+    const response = await tgFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify({
@@ -188,7 +220,7 @@ export async function setBotCommands(
   commands: Array<{ command: string; description: string }>
 ) {
   const url = `${TELEGRAM_API}/bot${botToken}/setMyCommands`;
-  const response = await fetch(url, {
+  const response = await tgFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({ commands }),
@@ -202,7 +234,7 @@ export async function setWebhook(
   secretToken?: string
 ) {
   const url = `${TELEGRAM_API}/bot${botToken}/setWebhook`;
-  const response = await fetch(url, {
+  const response = await tgFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({
@@ -216,6 +248,6 @@ export async function setWebhook(
 
 export async function getWebhookInfo(botToken: string) {
   const url = `${TELEGRAM_API}/bot${botToken}/getWebhookInfo`;
-  const response = await fetch(url);
+  const response = await tgFetch(url);
   return response.json();
 }

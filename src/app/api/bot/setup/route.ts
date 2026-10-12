@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { setWebhook, getWebhookInfo, setBotCommands } from "@/lib/telegram-bot";
+import {
+  setWebhook,
+  getWebhookInfo,
+  setBotCommands,
+  TelegramNetworkError,
+} from "@/lib/telegram-bot";
 import { randomBytes } from "crypto";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -76,16 +81,8 @@ export async function POST() {
       );
     }
 
-    // Set bot commands in Russian
-    await setBotCommands(botToken, [
-      { command: "start", description: "Начать работу с ботом" },
-      { command: "help", description: "Показать справку" },
-      { command: "services", description: "Наши услуги" },
-      { command: "info", description: "Информация о бизнесе" },
-      { command: "book", description: "Записаться" },
-    ]);
-
-    // Store webhook secret and mark as configured
+    // The webhook is set: remember it right away, so a hiccup in the optional
+    // steps below cannot leave the business marked as "not configured".
     try {
       await admin
         .from("users")
@@ -95,18 +92,33 @@ export async function POST() {
       // Column might not exist, ignore
     }
 
-    // Get webhook info for verification
-    const webhookInfo = await getWebhookInfo(botToken);
+    // Set bot commands in Russian (optional, never fails the setup)
+    await setBotCommands(botToken, [
+      { command: "start", description: "Начать работу с ботом" },
+      { command: "help", description: "Показать справку" },
+      { command: "services", description: "Наши услуги" },
+      { command: "info", description: "Информация о бизнесе" },
+      { command: "book", description: "Записаться" },
+    ]).catch(() => null);
+
+    const webhookInfo = await getWebhookInfo(botToken).catch(() => null);
 
     return NextResponse.json({
       success: true,
       webhook_url: webhookUrl,
-      webhook_info: webhookInfo.result,
+      webhook_info: webhookInfo?.result ?? null,
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Setup failed" },
-      { status: 500 }
+      {
+        error:
+          error instanceof TelegramNetworkError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Setup failed",
+      },
+      { status: error instanceof TelegramNetworkError ? 503 : 500 }
     );
   }
 }
@@ -130,6 +142,7 @@ export async function GET() {
   // Try to get bot data - handle missing columns gracefully
   let botToken: string | null = null;
   let botUsername: string | null = null;
+  let storedWebhookSet = false;
 
   try {
     const { data: userData } = await supabase
@@ -140,6 +153,7 @@ export async function GET() {
     if (userData) {
       botToken = userData.bot_token;
       botUsername = userData.bot_username;
+      storedWebhookSet = userData.bot_webhook_set === true;
     }
   } catch {
     // Columns might not exist
@@ -154,6 +168,7 @@ export async function GET() {
   // bot cannot deliver messages even though bot_webhook_set may read as true.
   let webhookInfoResult: Record<string, unknown> | null = null;
   let tokenValid = true;
+  let networkError = false;
   try {
     const info = await getWebhookInfo(botToken);
     const parsed = info as { ok?: boolean; result?: Record<string, unknown> };
@@ -163,16 +178,21 @@ export async function GET() {
       tokenValid = false;
     }
   } catch {
-    tokenValid = false;
+    // Telegram unreachable right now: that says nothing about the token, so
+    // fall back to the stored state instead of reporting a broken bot.
+    networkError = true;
   }
 
-  const actualWebhookSet = tokenValid && !!webhookInfoResult?.url;
+  const actualWebhookSet = networkError
+    ? storedWebhookSet
+    : tokenValid && !!webhookInfoResult?.url;
 
   return NextResponse.json({
     configured: true,
     username: botUsername,
     webhook_set: actualWebhookSet,
     token_valid: tokenValid,
+    network_error: networkError,
     webhook_info: webhookInfoResult,
   });
 }

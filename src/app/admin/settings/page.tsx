@@ -52,6 +52,7 @@ export default function SettingsPage() {
   const [botToken, setBotToken] = useState("");
   const [botUsername, setBotUsername] = useState("");
   const [botTokenSet, setBotTokenSet] = useState(false);
+  const [botNetworkError, setBotNetworkError] = useState(false);
   const [botWebhookSet, setBotWebhookSet] = useState(false);
   const [botTokenValid, setBotTokenValid] = useState(true);
   const [botWebhookUrl, setBotWebhookUrl] = useState("");
@@ -115,6 +116,7 @@ export default function SettingsPage() {
           setBotUsername(data.username || "");
           setBotWebhookSet(data.webhook_set || false);
           setBotTokenValid(data.token_valid !== false);
+          setBotNetworkError(data.network_error === true);
           setBotWebhookUrl(data.webhook_info?.url || "");
           setBotWebhookLastError(
             data.webhook_info?.last_error_message || ""
@@ -141,6 +143,7 @@ export default function SettingsPage() {
         setBotUsername(data.username || "");
         setBotWebhookSet(data.webhook_set || false);
         setBotTokenValid(data.token_valid !== false);
+        setBotNetworkError(data.network_error === true);
         setBotWebhookUrl(data.webhook_info?.url || "");
         setBotWebhookLastError(
           data.webhook_info?.last_error_message || ""
@@ -472,9 +475,24 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {botTokenSet && !botWebhookSet && (
-              <Button onClick={handleSetupBot} disabled={settingUpBot}>
-                {settingUpBot ? "Настройка..." : "Настроить вебхук"}
+            {botNetworkError && (
+              <div className="p-3 bg-amber-50 rounded-lg text-amber-800 text-sm">
+                Не удалось связаться с Telegram для проверки бота. Обычно это
+                временно — обновите страницу через минуту.
+              </div>
+            )}
+
+            {botTokenSet && (
+              <Button
+                onClick={handleSetupBot}
+                disabled={settingUpBot}
+                variant={botWebhookSet ? "outline" : "default"}
+              >
+                {settingUpBot
+                  ? "Настройка..."
+                  : botWebhookSet
+                    ? "Переподключить вебхук"
+                    : "Настроить вебхук"}
               </Button>
             )}
 

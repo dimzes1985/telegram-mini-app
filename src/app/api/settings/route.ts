@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { tgFetch, telegramApiUrl } from "@/lib/telegram-bot";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAiUsage } from "@/lib/ai-usage";
@@ -222,9 +223,7 @@ export async function PUT(req: Request) {
   if (bot_token !== undefined && bot_token && !bot_token.startsWith("••••")) {
     let telegramUsername: string | null = null;
     try {
-      const response = await fetch(
-        `https://api.telegram.org/bot${bot_token}/getMe`
-      );
+      const response = await tgFetch(telegramApiUrl(bot_token, "getMe"));
       const data = await response.json();
       if (!data.ok) {
         return NextResponse.json(
