@@ -12,6 +12,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LogoutButton } from "@/components/admin/logout-button";
 
 const navItems = [
   {
@@ -98,6 +99,8 @@ export function Sidebar() {
             );
           })}
         </nav>
+
+        <LogoutButton className="mt-auto rounded-lg px-3 py-2 text-sm font-medium text-gray-400 transition-colors hover:bg-gray-800 hover:text-white" />
       </aside>
 
       {/* Mobile bottom navigation */}
