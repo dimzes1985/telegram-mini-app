@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { ClosuresCard } from "@/components/admin/closures-card";
+import { LogoutButton } from "@/components/admin/logout-button";
 import { Save, Bot, ExternalLink, CheckCircle, Bell, Smartphone } from "lucide-react";
 
 interface WorkingHoursDay {
@@ -326,7 +327,10 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6 sm:text-3xl sm:mb-8">Настройки</h1>
+      <div className="mb-6 flex items-center justify-between gap-4 sm:mb-8">
+        <h1 className="text-2xl font-bold sm:text-3xl">Настройки</h1>
+        <LogoutButton className="rounded-lg border bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 lg:hidden" />
+      </div>
 
       <div className="max-w-2xl space-y-6">
         <Card>
