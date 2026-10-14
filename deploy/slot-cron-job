@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+umask 077
+JOB=${1:-}
+case "$JOB" in
+  reminders) ENDPOINT=send-reminders ;;
+  renew) ENDPOINT=renew-subscriptions ;;
+  *) echo 'Usage: slot-cron-job reminders|renew [--check-config]' >&2; exit 2 ;;
+esac
+CONFIG=/etc/slot/cron-curl.conf
+test -r "$CONFIG"
+if [[ "${2:-}" == --check-config ]]; then
+  printf 'CONFIG_OK job=%s (endpoint not invoked)\n' "$JOB"; exit 0
+fi
+mkdir -p /var/log/slot
+chmod 700 /var/log/slot
+exec 9>"/run/lock/slot-$JOB.lock"
+flock -n 9 || { logger -t slot-cron "job=$JOB skipped: already running"; exit 0; }
+OUT=$(mktemp /var/log/slot/.job-XXXXXX)
+trap 'rm -f "$OUT"' EXIT
+# No automatic HTTP retries: renewal may cause a real charge.
+if ! curl --config "$CONFIG" --fail-with-body --silent --show-error --max-time 120 \
+  "https://slot-zapis.ru/api/cron/$ENDPOINT" > "$OUT"; then
+  logger -t slot-cron "job=$JOB HTTP failure; inspect protected logs"
+  mv "$OUT" "/var/log/slot/$JOB-last-response.json"; exit 1
+fi
+if ! python3 - "$JOB" "$OUT" <<'PY2'
+import json,sys
+job,path=sys.argv[1:];d=json.load(open(path))
+if d.get('demo'): raise SystemExit('Refusing to accept a demo cron result on production')
+if job=='reminders':
+ if any(not isinstance(d.get(k),int) for k in ('found','sent','failed')):raise SystemExit('Unexpected reminder response')
+ print('found=%s sent=%s failed=%s'%(d.get('found'),d.get('sent'),d.get('failed')))
+ if d.get('failed',0): raise SystemExit('Reminder failures require operator review; no automatic retry')
+else:
+ if not isinstance(d.get('processed'),int) or not isinstance(d.get('results'),list):raise SystemExit('Unexpected renewal response')
+ statuses=[r.get('status') for r in d.get('results',[])]
+ print('processed=%s errors=%s'%(d.get('processed'),statuses.count('error')))
+ if 'error' in statuses or 'past_due' in statuses: raise SystemExit('Renewal requires operator review')
+PY2
+then
+  mv "$OUT" "/var/log/slot/$JOB-last-response.json"
+  logger -p daemon.err -t slot-cron "job=$JOB response requires operator review"
+  exit 1
+fi
+mv "$OUT" "/var/log/slot/$JOB-last-response.json"
+logger -t slot-cron "job=$JOB succeeded"

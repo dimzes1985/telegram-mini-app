@@ -78,8 +78,10 @@ async function deliver(row: ReminderRow): Promise<boolean> {
 }
 
 // Sends "tomorrow" reminders to customers who booked via Telegram / MAX.
-// Each booking is reminded at most once (reminder_sent_at), even if delivery
-// fails (e.g. the customer blocked the bot), so retries never spam.
+// Only acknowledged successful delivery sets reminder_sent_at. Failed rows
+// remain eligible for an operator-controlled retry on the same business day.
+// Run jobs serially: external delivery + DB acknowledgement are not atomic,
+// so ambiguous network/DB failures cannot guarantee exactly-once delivery.
 export async function sendTomorrowReminders(
   supabase: SupabaseClient,
   now: Date = new Date()
@@ -108,12 +110,18 @@ export async function sendTomorrowReminders(
 
   for (const row of rows) {
     const ok = await deliver(row);
-    if (ok) sent++;
-    else failed++;
-    await supabase
+    if (!ok) {
+      failed++;
+      continue;
+    }
+    const { error: markError } = await supabase
       .from("bookings")
       .update({ reminder_sent_at: new Date().toISOString() })
       .eq("id", row.id);
+    if (markError) {
+      throw new Error("Reminder delivered but acknowledgement could not be saved");
+    }
+    sent++;
   }
 
   return { date: tomorrow, found: rows.length, sent, failed };

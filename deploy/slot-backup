@@ -1,0 +1,27 @@
+#!/bin/bash
+set -euo pipefail
+umask 077
+BASE=/var/backups/slot/daily
+mkdir -p "$BASE"
+chmod 700 /var/backups/slot "$BASE"
+exec 9>/run/lock/slot-backup.lock
+flock -n 9 || exit 0
+D="$BASE/$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir "$D"
+trap 'logger -t slot-backup "backup failed; protected partial directory retained"' ERR
+docker exec supabase-db pg_dump -U supabase_admin -d postgres --format=custom > "$D/postgres.dump"
+test -s "$D/postgres.dump"
+docker exec -i supabase-db pg_restore --list < "$D/postgres.dump" > "$D/archive-list.txt"
+docker exec supabase-db psql -U supabase_admin -d postgres -At -v ON_ERROR_STOP=1 \
+  -c "select format('CREATE ROLE %I NOLOGIN;',rolname) from pg_roles where rolname !~ '^pg_' and rolname <> 'postgres'" > "$D/restore-roles.sql"
+docker exec supabase-db psql -U supabase_admin -d postgres -At -v ON_ERROR_STOP=1 \
+  -c "select pg_get_functiondef(to_regprocedure('graphql_public.graphql(text,text,jsonb,jsonb)'));" > "$D/graphql-helper.sql"
+docker exec -i supabase-db psql -U supabase_admin -d postgres -At -v ON_ERROR_STOP=1   < /usr/local/lib/slot/restore-role-metadata.sql > "$D/restore-role-attributes.sql"
+cp -a /opt/slot/app.env /opt/slot/secrets.env /opt/slot/.env /opt/slot/docker-compose.yml "$D/"
+cp -a /etc/cron.d/slot "$D/cron-slot"
+docker inspect --format '{{.Image}}' slot-app > "$D/image-id.txt"
+sha256sum "$D/postgres.dump" > "$D/postgres.dump.sha256"
+printf '%s\n' "$D" > /var/backups/slot/latest-daily-path
+logger -t slot-backup 'database backup and archive readability check succeeded'
+printf 'BACKUP_OK\n'
+# No automatic deletion. Arrange off-server storage and a retention policy.

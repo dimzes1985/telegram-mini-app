@@ -1,0 +1,23 @@
+#!/bin/bash
+set -euo pipefail
+umask 077
+mkdir -p /var/log/slot
+chmod 700 /var/log/slot
+OUT=$(mktemp /var/log/slot/.health-XXXXXX)
+trap 'rm -f "$OUT"' EXIT
+if ! curl --fail-with-body --silent --show-error --max-time 15 https://slot-zapis.ru/api/health > "$OUT"; then
+  mv "$OUT" /var/log/slot/health-last.json
+  logger -p daemon.err -t slot-health 'health HTTP failure; inspect protected logs'
+  exit 1
+fi
+if ! python3 - "$OUT" <<'PY2'
+import json,sys
+r=json.load(open(sys.argv[1]))
+if r.get('ok') is not True or r.get('database')!='ok' or r.get('redis')!='ok':raise SystemExit(1)
+PY2
+then
+  mv "$OUT" /var/log/slot/health-last.json
+  logger -p daemon.err -t slot-health 'database/Redis health failure'
+  exit 1
+fi
+mv "$OUT" /var/log/slot/health-last.json
